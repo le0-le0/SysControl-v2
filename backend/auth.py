@@ -13,7 +13,9 @@ def init_secret():
     global SECRET_KEY
     import config
     cfg = config.get_config()
-    SECRET_KEY = cfg.get("jwt_secret") or cfg["password_hash"][:32] if cfg else "fallback-key"
+    if not cfg:
+        raise RuntimeError("Cannot init auth: no config found")
+    SECRET_KEY = cfg.get("jwt_secret") or cfg["password_hash"][:32]
 
 
 def create_token(device_id):

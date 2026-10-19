@@ -94,6 +94,11 @@ def mic_stop():
         _mic_stream.stop()
         _mic_stream.close()
         _mic_stream = None
+    while not _mic_queue.empty():
+        try:
+            _mic_queue.get_nowait()
+        except queue.Empty:
+            break
     return {"ok": True}
 
 

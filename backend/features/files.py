@@ -1,11 +1,25 @@
 """File explorer — browse, download, upload, edit, rename, delete, create."""
 import os
-import re
 import base64
 import shutil
 from pathlib import Path
 
 MAX_EDIT_BYTES = 1024 * 1024
+MAX_UPLOAD_BYTES = 15 * 1024 * 1024
+
+BLOCKED_DIRS = {
+    "windows\\system32", "windows\\syswow64", "program files",
+    "program files (x86)", "programdata",
+}
+
+
+def _is_safe_path(path_str):
+    """Block access to critical OS directories."""
+    normed = os.path.normpath(path_str).lower()
+    for blocked in BLOCKED_DIRS:
+        if blocked in normed:
+            return False
+    return True
 
 EDITABLE_EXTS = {
     "txt", "md", "log", "ini", "cfg", "conf", "csv", "tsv",
@@ -81,6 +95,8 @@ def read_file(path):
 
 
 def save_file(path, content, encoding="utf-8"):
+    if not _is_safe_path(path):
+        return {"ok": False, "error": "Access denied"}
     try:
         Path(path).write_text(content, encoding=encoding)
         return {"ok": True}
@@ -97,8 +113,12 @@ def download_file(path):
 
 
 def upload_file(directory, name, b64_data):
+    if not _is_safe_path(directory):
+        return {"ok": False, "error": "Access denied"}
     try:
         raw = base64.b64decode(b64_data)
+        if len(raw) > MAX_UPLOAD_BYTES:
+            return {"ok": False, "error": "File too large (max 15 MB)"}
         dest = Path(directory) / name
         dest.write_bytes(raw)
         return {"ok": True}
@@ -107,6 +127,8 @@ def upload_file(directory, name, b64_data):
 
 
 def delete_path(path):
+    if not _is_safe_path(path):
+        return {"ok": False, "error": "Access denied"}
     p = Path(path)
     try:
         if p.is_dir():
@@ -121,6 +143,10 @@ def delete_path(path):
 
 
 def rename_path(old_path, new_name):
+    if not _is_safe_path(old_path):
+        return {"ok": False, "error": "Access denied"}
+    if os.sep in new_name or "/" in new_name:
+        return {"ok": False, "error": "Invalid name"}
     p = Path(old_path)
     try:
         new = p.parent / new_name

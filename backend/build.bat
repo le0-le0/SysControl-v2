@@ -28,6 +28,7 @@ pyinstaller --onefile --noconsole --name "SystemMonitor" ^
     --hidden-import features.startup ^
     --hidden-import cv2 ^
     --hidden-import numpy ^
+    --hidden-import psutil ^
     server.py
 
 echo.

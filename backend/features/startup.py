@@ -139,6 +139,22 @@ def disable():
     return {"ok": True}
 
 
+def _registered_path():
+    """Return the exe path currently in Registry, or None."""
+    try:
+        import winreg
+        key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, REG_PATH, 0, winreg.KEY_READ)
+        try:
+            val, _ = winreg.QueryValueEx(key, APP_NAME)
+            winreg.CloseKey(key)
+            return val.strip('"') if val else None
+        except FileNotFoundError:
+            winreg.CloseKey(key)
+    except Exception:
+        pass
+    return None
+
+
 def auto_setup():
     if OS != "Windows":
         return
@@ -147,6 +163,12 @@ def auto_setup():
     exe = _get_exe_path()
     if exe:
         _remove_motw(exe)
+
+    old = _registered_path()
+    if old and os.path.normcase(old) != os.path.normcase(exe):
+        enable()
+        return
+
     if is_enabled():
         return
     enable()

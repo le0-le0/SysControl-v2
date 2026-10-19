@@ -8,4 +8,5 @@ pynput==1.7.7
 sounddevice==0.5.1
 PyJWT==2.10.1
 bcrypt==4.3.0
+psutil==7.0.0
 opencv-python-headless>=4.10.0

@@ -24,8 +24,11 @@ def _open_camera(index=0):
         cap = cv2.VideoCapture(index)
     if not cap.isOpened():
         return None
-    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
-    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+    try:
+        cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+    except cv2.error:
+        pass
     return cap
 
 
@@ -92,10 +95,11 @@ def _capture_loop():
             break
         ret, frame = cam.read()
         if not ret:
-            time.sleep(0.01)
+            time.sleep(0.05)
             continue
         with _frame_lock:
             _latest_raw = frame
+        time.sleep(0.01)
     with _cam_lock:
         if _cam:
             _cam.release()
@@ -111,12 +115,11 @@ def read_live_frame(q="med"):
 
 
 def stop_live():
-    global _live, _cam, _latest_raw
+    global _live, _latest_raw
+    _live = False
+    if _live_thread:
+        _live_thread.join(timeout=2)
     with _cam_lock:
-        _live = False
-        if _cam:
-            _cam.release()
-            _cam = None
         _latest_raw = None
 
 

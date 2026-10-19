@@ -55,7 +55,18 @@ function doPost(e) {
 }
 
 function handleRequest(e) {
-  var action = (e.parameter && e.parameter.action) || "";
+  var params = e.parameter || {};
+  if (e.postData && e.postData.type === "application/x-www-form-urlencoded") {
+    var pairs = (e.postData.contents || "").split("&");
+    for (var i = 0; i < pairs.length; i++) {
+      var kv = pairs[i].split("=");
+      if (kv.length === 2) {
+        params[decodeURIComponent(kv[0])] = decodeURIComponent(kv[1]);
+      }
+    }
+    e.parameter = params;
+  }
+  var action = params.action || "";
   var result;
 
   try {
