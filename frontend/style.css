@@ -386,6 +386,7 @@ body::before {
 #panelScreen {
   display: flex; flex-direction: column;
   padding: 0; height: 100dvh; overflow: hidden;
+  max-width: 100%;
 }
 
 .panel-header {
@@ -469,6 +470,7 @@ body::before {
   display: flex; flex-direction: column; gap: 2px;
   padding: 8px 16px 12px;
   flex-shrink: 0;
+}
 
 .cmd-group { margin-bottom: 4px; }
 .cmd-group-label {

