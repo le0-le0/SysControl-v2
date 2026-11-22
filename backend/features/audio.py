@@ -16,7 +16,7 @@ _tts_lock = threading.Lock()
 
 # Mic state
 _mic_stream = None
-_mic_queue = queue.Queue(maxsize=25)
+_mic_queue = queue.Queue(maxsize=50)
 _mic_rate = 16000
 _mic_channels = 1
 
@@ -64,7 +64,7 @@ def mic_start(sample_rate=16000, channels=1):
             samplerate=_mic_rate,
             channels=_mic_channels,
             dtype="float32",
-            blocksize=int(_mic_rate * 0.4),
+            blocksize=int(_mic_rate * 0.1),
             callback=callback,
         )
         _mic_stream.start()

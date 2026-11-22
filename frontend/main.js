@@ -1411,7 +1411,7 @@ function closeUpdate() {
 
 /* ═══ LIVE MIC ═══ */
 
-const mic = { on: false, timer: null, busy: false, ctx: null, next: 0 };
+const mic = { on: false, ctx: null, next: 0 };
 
 function openLiveMic() {
   show("micOverlay");
@@ -1433,45 +1433,42 @@ async function startMic() {
     mic.on = true;
     if (!mic.ctx) mic.ctx = new (window.AudioContext || window.webkitAudioContext)();
     if (mic.ctx.state === "suspended") mic.ctx.resume();
-    mic.next = mic.ctx.currentTime + 0.1;
+    mic.next = mic.ctx.currentTime;
     hide("micStartBtn");
     show("micStopBtn");
     $("micStatus").textContent = "Listening...";
     $("micMeta").textContent = "LIVE";
     $("micIcon").classList.add("active");
-    mic.timer = setInterval(fetchMicChunk, 400);
+    micLoop();
   } catch {
     $("micStatus").textContent = "Failed to start";
   }
 }
 
-function fetchMicChunk() {
-  if (!mic.on || mic.busy) return;
-  mic.busy = true;
-  apiRaw(`/api/mic/chunk?t=${Date.now()}`)
-    .then((r) => {
+async function micLoop() {
+  while (mic.on) {
+    try {
+      const r = await apiRaw(`/api/mic/chunk?t=${Date.now()}`);
       const ct = r.headers.get("Content-Type") || "";
-      return ct.includes("audio") ? r.arrayBuffer() : null;
-    })
-    .then((buf) => {
-      mic.busy = false;
-      if (!buf || !mic.on || !mic.ctx) return;
-      mic.ctx.decodeAudioData(buf, (ab) => {
-        if (!mic.on) return;
+      if (!ct.includes("audio")) continue;
+      const buf = await r.arrayBuffer();
+      if (!mic.on || !mic.ctx) break;
+      try {
+        const ab = await mic.ctx.decodeAudioData(buf);
+        if (!mic.on) break;
         const src = mic.ctx.createBufferSource();
         src.buffer = ab;
         src.connect(mic.ctx.destination);
-        const t = Math.max(mic.next, mic.ctx.currentTime + 0.02);
+        const t = Math.max(mic.next, mic.ctx.currentTime);
         src.start(t);
         mic.next = t + ab.duration;
-      }, () => {});
-    })
-    .catch(() => { mic.busy = false; });
+      } catch {}
+    } catch { if (mic.on) await new Promise(r => setTimeout(r, 100)); }
+  }
 }
 
 function stopMic() {
   mic.on = false;
-  if (mic.timer) { clearInterval(mic.timer); mic.timer = null; }
   api("/api/mic/stop", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" }).catch(() => {});
   show("micStartBtn");
   hide("micStopBtn");
