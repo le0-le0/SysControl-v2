@@ -170,7 +170,12 @@ def apply_update(update_info):
         except Exception:
             pass  # credential store may be unavailable (locked screen / SYSTEM session)
 
-        subprocess.Popen(["cmd", "/c", bat], creationflags=_NO_WINDOW)
+        subprocess.Popen(
+            ["cmd", "/c", bat],
+            creationflags=_NO_WINDOW | subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP,
+            close_fds=True,
+        )
+        import time; time.sleep(1)
         os._exit(0)
 
     except Exception as e:
