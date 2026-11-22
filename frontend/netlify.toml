@@ -1,6 +1,0 @@
-# The static frontend lives directly in this directory (the configured base).
-# Publish path is resolved relative to the base, so "." means "frontend/".
-# This overrides the UI build settings that incorrectly resolved to "frontend/frontend".
-[build]
-  publish = "."
-  
