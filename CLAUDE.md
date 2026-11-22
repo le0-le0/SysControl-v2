@@ -99,7 +99,7 @@ Each module is self-contained with no cross-dependencies between features:
 - **shell.py** — `subprocess.Popen(cmd, shell=True)` with thread-safe CWD tracking via `threading.Lock`. Handles `cd` as a special case.
 - **files.py** — Full file operations: browse, read/write, upload/download (base64), rename, delete, mkdir. Whitelist of editable extensions. Path safety checks block access to critical OS directories (`System32`, `ProgramData`, `Program Files`). Upload capped at 15 MB. Rename rejects path separators.
 - **system.py** — OS info (including CPU/RAM via psutil), public IP, clipboard read (`pyperclip.paste()`) and write (`pyperclip.copy()`), WiFi passwords (netsh export), lock screen, shutdown.
-- **audio.py** — TTS via pyttsx3 (threaded), live mic via sounddevice (16kHz, WAV chunks via queue). Queue is drained on mic stop to prevent stale audio.
+- **audio.py** — TTS via pyttsx3 (threaded), live mic via sounddevice (16kHz, 100ms blocks, WAV chunks via queue). Queue is drained on mic stop to prevent stale audio.
 - **keylog.py** — pynput keyboard listener, thread-safe `deque` buffer (10K max, O(1) overflow), special key mapping.
 - **startup.py** — Bulletproof Windows auto-start using dual approach: Task Scheduler (`ONLOGON`, `HIGHEST` privilege) + Registry Run key fallback. `auto_setup()` called at top of `main()` — registers silently when running as .exe. Re-registers if exe path has moved. Remote control via `/startup`, `/startup on`, `/startup off` commands.
 
@@ -124,6 +124,7 @@ Built with **Vite** + **Tailwind CSS v4** (CSS-first config, no `tailwind.config
 ### Config Files (repo root)
 
 - **netlify.toml** — Netlify deploy config: base `frontend/`, build `npm install && npm run build`, publish `dist/`. Security headers (X-Frame-Options, X-Content-Type-Options, Referrer-Policy).
+- **.vscode/settings.json** — Suppresses VSCode's built-in CSS validator warnings for Tailwind CSS v4 at-rules (`@theme`, `@apply`).
 
 ## Key Design Decisions
 
@@ -144,7 +145,7 @@ Built with **Vite** + **Tailwind CSS v4** (CSS-first config, no `tailwind.config
 - **Clipboard sync** — Read remote clipboard and paste text to remote clipboard. `clipboardMenu()` shows a two-step dialog (Read vs Paste To). Backend `set_clipboard()` uses `pyperclip.copy()`.
 - **File drag-and-drop** — Explorer panel supports drag-and-drop file upload via `initDragDrop()` IIFE. Uses `dragCount` ref-counter to prevent child element flicker on dragenter/dragleave.
 - **In-app activity log** — `slog(level, msg)` appends to a 500-entry ring buffer with timestamp. Auto-logged: every API call (path, status, timing), auth events, connect/disconnect, health transitions, uncaught errors, unhandled promise rejections. Log overlay with Save (download .txt) and Clear buttons. Session-only — no localStorage persistence.
-- **Adaptive live streaming** — Both Live Screen and Live Camera use adaptive polling: next frame is fetched only after the previous one loads, with a configurable delay per quality tier. Naturally adapts to network speed — no request pileup.
+- **Adaptive live streaming** — Both Live Screen and Live Camera use adaptive polling: next frame is fetched only after the previous one loads, with a configurable delay per quality tier. Naturally adapts to network speed — no request pileup. Live Mic uses a tight async loop (`micLoop`) — fetches the next 100ms WAV chunk immediately after the previous one arrives, with Web Audio API scheduling for gapless playback.
 - **Webcam via OpenCV** — Uses `opencv-python-headless` (no ffmpeg binary needed). Two buttons: "Webcam" for instant chat screenshot, "Cam" for live camera overlay with L/M/H quality.
 - **Frontend auth** — Username/password login via POST to GAS "Users" sheet. Session persists in localStorage. Only manually-added users can access the dashboard.
 - **Embedded HTML** — Status page is a raw HTML string inside `server.py`, not a separate file.
