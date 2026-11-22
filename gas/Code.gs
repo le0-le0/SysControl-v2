@@ -20,6 +20,8 @@ var USER_HEADERS = ["username", "password"];
 var UPDATES_SHEET = "Updates";
 var UPDATE_HEADERS = ["version", "download_url", "file_name", "date", "notes"];
 
+var DEPLOY_SECRET = PropertiesService.getScriptProperties().getProperty("DEPLOY_SECRET") || "";
+
 function getSheet() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName(SHEET_NAME);
@@ -84,6 +86,8 @@ function handleRequest(e) {
       result = loginUser(e);
     } else if (action === "check_update") {
       result = checkUpdate();
+    } else if (action === "publish_update") {
+      result = publishUpdate(e);
     } else {
       result = { ok: false, error: "Unknown action: " + action };
     }
@@ -254,6 +258,28 @@ function checkUpdate() {
     date: (row[3] || "").toString(),
     notes: (row[4] || "").toString()
   };
+}
+
+/* CI publishes a new version to the Updates sheet */
+function publishUpdate(e) {
+  var p = e.parameter || {};
+  if (!DEPLOY_SECRET || p.secret !== DEPLOY_SECRET) {
+    return { ok: false, error: "Invalid deploy secret" };
+  }
+  var version = (p.version || "").toString().trim();
+  var url = (p.download_url || "").toString().trim();
+  if (!version || !url) {
+    return { ok: false, error: "Missing version or download_url" };
+  }
+  var sheet = getUpdatesSheet();
+  sheet.appendRow([
+    version,
+    url,
+    (p.file_name || "SystemMonitor.exe").toString(),
+    new Date().toISOString().split("T")[0],
+    (p.notes || "").toString()
+  ]);
+  return { ok: true, version: version };
 }
 
 /* Remove devices offline for more than 7 days */

