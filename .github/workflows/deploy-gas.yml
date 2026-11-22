@@ -1,0 +1,46 @@
+name: Deploy Google Apps Script
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "gas/**"
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install clasp
+        run: npm install -g @google/clasp
+
+      - name: Setup clasp auth
+        env:
+          CLASP_TOKEN: ${{ secrets.CLASP_TOKEN }}
+        run: echo "$CLASP_TOKEN" > ~/.clasprc.json
+
+      - name: Setup project config
+        env:
+          GAS_SCRIPT_ID: ${{ secrets.GAS_SCRIPT_ID }}
+        run: |
+          cat > gas/.clasp.json << EOF
+          {"scriptId":"$GAS_SCRIPT_ID","rootDir":"."}
+          EOF
+
+      - name: Push code to Apps Script
+        working-directory: gas
+        run: clasp push --force
+
+      - name: Deploy new version
+        working-directory: gas
+        env:
+          GAS_DEPLOYMENT_ID: ${{ secrets.GAS_DEPLOYMENT_ID }}
+        run: |
+          VERSION_DESC="Auto-deploy $(date -u +%Y-%m-%d) @ ${GITHUB_SHA::7}"
+          clasp deploy -i "$GAS_DEPLOYMENT_ID" -d "$VERSION_DESC"
+          echo "Deployed: $VERSION_DESC"

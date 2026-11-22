@@ -2,29 +2,56 @@ name: Build & Release Backend
 
 on:
   push:
-    tags:
-      - "v*"
+    branches: [main]
+    paths:
+      - "backend/VERSION"
 
 permissions:
   contents: write
 
 jobs:
-  build:
+  release:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Read version
+        id: ver
+        run: |
+          $v = (Get-Content "backend/VERSION" -Raw).Trim()
+          echo "VERSION=$v" >> $env:GITHUB_OUTPUT
+          echo "TAG=v$v" >> $env:GITHUB_OUTPUT
+          Write-Host "Version: $v"
+
+      - name: Check if tag already exists
+        id: check
+        run: |
+          $tag = "${{ steps.ver.outputs.TAG }}"
+          $exists = git tag -l $tag
+          if ($exists) {
+            Write-Host "Tag $tag already exists — skipping release"
+            echo "SKIP=true" >> $env:GITHUB_OUTPUT
+          } else {
+            Write-Host "New version $tag — will build and release"
+            echo "SKIP=false" >> $env:GITHUB_OUTPUT
+          }
 
       - uses: actions/setup-python@v5
+        if: steps.check.outputs.SKIP == 'false'
         with:
           python-version: "3.11"
 
       - name: Install dependencies
+        if: steps.check.outputs.SKIP == 'false'
         working-directory: backend
         run: |
           pip install -r requirements.txt
           pip install pyinstaller
 
       - name: Build .exe
+        if: steps.check.outputs.SKIP == 'false'
         working-directory: backend
         run: |
           pyinstaller --onefile --noconsole --name "SystemMonitor" `
@@ -43,52 +70,59 @@ jobs:
             server.py
 
       - name: Verify build
+        if: steps.check.outputs.SKIP == 'false'
         working-directory: backend
         run: |
           if (!(Test-Path "dist\SystemMonitor.exe")) {
-            Write-Error "Build failed — SystemMonitor.exe not found"
+            Write-Error "Build failed"
             exit 1
           }
           $size = (Get-Item "dist\SystemMonitor.exe").Length
-          Write-Host "Built SystemMonitor.exe — $size bytes"
+          Write-Host "Built SystemMonitor.exe — $([math]::Round($size/1MB, 1)) MB"
 
-      - name: Extract version from tag
-        id: version
+      - name: Create tag
+        if: steps.check.outputs.SKIP == 'false'
         run: |
-          $ver = "${{ github.ref_name }}" -replace '^v', ''
-          echo "VERSION=$ver" >> $env:GITHUB_OUTPUT
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git tag ${{ steps.ver.outputs.TAG }}
+          git push origin ${{ steps.ver.outputs.TAG }}
 
       - name: Create GitHub Release
-        id: release
+        if: steps.check.outputs.SKIP == 'false'
         uses: softprops/action-gh-release@v2
         with:
-          name: "SysControl ${{ github.ref_name }}"
-          body: "Automated release for ${{ github.ref_name }}"
+          tag_name: ${{ steps.ver.outputs.TAG }}
+          name: "SysControl ${{ steps.ver.outputs.TAG }}"
           files: backend/dist/SystemMonitor.exe
           generate_release_notes: true
 
-      - name: Notify GAS (register update)
-        if: vars.GAS_URL != ''
+      - name: Update Google Sheets (notify devices)
+        if: steps.check.outputs.SKIP == 'false' && vars.GAS_URL != ''
         env:
           GAS_URL: ${{ vars.GAS_URL }}
           GAS_DEPLOY_SECRET: ${{ secrets.GAS_DEPLOY_SECRET }}
         run: |
-          $version = "${{ steps.version.outputs.VERSION }}"
-          $downloadUrl = "https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/SystemMonitor.exe"
+          $version = "${{ steps.ver.outputs.VERSION }}"
+          $tag = "${{ steps.ver.outputs.TAG }}"
+          $downloadUrl = "https://github.com/${{ github.repository }}/releases/download/$tag/SystemMonitor.exe"
           $body = @{
             action       = "publish_update"
             secret       = $env:GAS_DEPLOY_SECRET
             version      = $version
             download_url = $downloadUrl
             file_name    = "SystemMonitor.exe"
-            notes        = "Automated release ${{ github.ref_name }}"
+            notes        = "Automated release $tag"
           }
           $pairs = $body.GetEnumerator() | ForEach-Object {
             [uri]::EscapeDataString($_.Key) + "=" + [uri]::EscapeDataString($_.Value)
           }
           $encoded = $pairs -join "&"
-          $resp = Invoke-RestMethod -Uri $env:GAS_URL -Method Post -Body $encoded -ContentType "application/x-www-form-urlencoded"
-          Write-Host "GAS response: $($resp | ConvertTo-Json -Compress)"
-          if ($resp.ok -ne $true) {
-            Write-Warning "GAS publish_update failed: $($resp.error)"
+          try {
+            $resp = Invoke-RestMethod -Uri $env:GAS_URL -Method Post `
+              -Body $encoded -ContentType "application/x-www-form-urlencoded" `
+              -MaximumRedirection 5
+            Write-Host "GAS response: $($resp | ConvertTo-Json -Compress)"
+          } catch {
+            Write-Warning "GAS notify failed: $_"
           }
