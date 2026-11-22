@@ -10,14 +10,20 @@ SysControl v2 is a remote system monitoring tool for Windows. A Python HTTP back
 
 ### Development
 ```powershell
+# Backend
 cd backend
 python -m venv .venv
 .venv\Scripts\activate
 pip install -r requirements.txt
 python server.py              # starts on http://localhost:5000
+
+# Frontend
+cd frontend
+npm install
+npm run dev                   # starts Vite dev server on http://localhost:5173
 ```
 
-Or use the shortcut: `backend\install.bat`
+Or use the shortcut for backend: `backend\install.bat`
 
 ### Build .exe (local)
 ```powershell
@@ -34,7 +40,7 @@ git add -A; git commit -m "Release v3.3.0"; git push
 The workflow auto-creates the git tag, builds the .exe on a Windows runner, creates a GitHub Release with the binary, and updates the Google Sheets "Updates" tab so deployed devices discover it. No manual `git tag` needed.
 
 ### Deploy Frontend
-Push to `main` — Netlify auto-deploys via GitHub webhook. Config in `netlify.toml` at repo root (publish dir: `frontend/`, no build step).
+Push to `main` — Netlify auto-builds and deploys via GitHub webhook. Config in `netlify.toml` at repo root (base: `frontend/`, build: `npm install && npm run build`, publish: `dist/`).
 
 ### Deploy Google Apps Script
 Push changes to `gas/` on `main` — GitHub Actions runs `clasp push` + `clasp deploy` to update the live GAS deployment in-place. Same URL, no manual redeployment.
@@ -47,7 +53,7 @@ Fully automated — just push to `main`:
 
 | Change | Trigger | What happens |
 |--------|---------|-------------|
-| `frontend/**` | Netlify webhook | Auto-deploys to Netlify |
+| `frontend/**` | Netlify webhook | `npm install && npm run build` → auto-deploys `dist/` to Netlify |
 | `backend/VERSION` | `release-backend.yml` | Builds .exe → creates tag → GitHub Release → updates GAS "Updates" sheet |
 | `gas/**` | `deploy-gas.yml` | `clasp push` → `clasp deploy` (updates existing deployment in-place) |
 
@@ -101,12 +107,14 @@ All Windows subprocesses use `CREATE_NO_WINDOW` (0x08000000) + `STARTUPINFO(wSho
 
 ### Frontend (`frontend/`)
 
-Vanilla HTML/JS/CSS, no framework, no build step. Modern ES2020+ syntax (const/let, arrow functions, async/await, template literals). Single-page app with screen toggling via `hidden` class.
+Built with **Vite** + **Tailwind CSS v4** (CSS-first config, no `tailwind.config.js`). ES modules, single-page app with screen toggling via `hidden` class. Modern ES2020+ syntax.
 
-- **main.js** — All logic: user auth via POST to GAS (login/logout), device discovery with auto-ping on load, on-demand live-ping status check, JWT auth with auto-refresh on 401 (re-authenticates with stored password, deduped via `_refreshing` promise), auto-connect using stored passwords (no password modal), 15-second `AbortSignal.timeout` on `api()`/`apiRaw()` calls, 12 overlay/modal managers, multi-monitor picker (`loadMonitors()`, `setLiveMon()`), file drag-and-drop upload onto explorer panel (with `dragCount` ref-counter to prevent flicker), clipboard menu (read remote clipboard or paste text to remote via dialog), in-app activity log (`slog(level, msg)` with 500-entry ring buffer, global `error`/`unhandledrejection` handlers, download as .txt). `GAS_URL` must be set to the deployed web app URL. Device list parsing extracted into `parseDevices()` helper. Toast notification system replaces all `alert()` calls. Promise-based custom dialog system replaces all native `confirm()` and `prompt()` calls. Debounced file explorer search. Escape key closes topmost overlay only.
-- **index.html** — Single-page app UI: auth screen, device list, login modal, control panel with 4 command groups (Display, Audio & I/O, Info, Control) using inline SVG icons (with Log button, monitor picker buttons in live overlay), shell terminal, file explorer, file editor, live screen, live camera, live mic, keylogger, update modal, activity log overlay, lightbox, toast container. JetBrains Mono loaded from Google Fonts. SVG logos use monospace "SC" text with green stroke border.
-- **style.css** — Terminal/cybersecurity dashboard theme: high-density, low-glare dark interface with crisp monospaced typography (JetBrains Mono / Fira Code / Cascadia Code as primary font for all elements). Green accent (`#00ff88`) with neon green status indicators. Sharp corners (2px radius), 12px base font size, tight padding throughout. Desktop sidebar layout via CSS Grid (`@media (min-width: 768px)`: 220px sidebar with controls + flexible chat area). Uppercase section labels with letter-spacing and bottom borders. No gradients — solid colors only. Minimal animations (removed decorative hover transforms). Toast, dialog, spinner, breathing status dot, drag-over styles, responsive breakpoints (mobile ≤480px, desktop ≥768px sidebar).
-- **manifest.json** — PWA manifest with inline SVG icon using monospace green-bordered "SC" logo (installable on phones).
+- **main.js** — All logic (ES module, functions exposed on `window` via `Object.assign` for HTML onclick handlers): user auth via POST to GAS (login/logout), device discovery with auto-ping on load, on-demand live-ping status check, JWT auth with auto-refresh on 401 (re-authenticates with stored password, deduped via `_refreshing` promise), auto-connect using stored passwords (no password modal), 15-second `AbortSignal.timeout` on `api()`/`apiRaw()` calls, 12 overlay/modal managers, multi-monitor picker (`loadMonitors()`, `setLiveMon()`), file drag-and-drop upload onto explorer panel (with `dragCount` ref-counter to prevent flicker), clipboard menu (read remote clipboard or paste text to remote via dialog), in-app activity log (`slog(level, msg)` with 500-entry ring buffer, global `error`/`unhandledrejection` handlers, download as .txt). `GAS_URL` must be set to the deployed web app URL. Device list parsing extracted into `parseDevices()` helper. Toast notification system replaces all `alert()` calls. Promise-based custom dialog system replaces all native `confirm()` and `prompt()` calls. Debounced file explorer search. Escape key closes topmost overlay only.
+- **index.html** — Single-page app UI: `<script type="module">` for Vite. Auth screen, device list, login modal, control panel with 4 command groups (Display, Audio & I/O, Info, Control) using inline SVG icons (with Log button, monitor picker buttons in live overlay), shell terminal, file explorer, file editor, live screen, live camera, live mic, keylogger, update modal, activity log overlay, lightbox, toast container. JetBrains Mono loaded from Google Fonts. SVG logos use monospace "SC" text with green stroke border.
+- **style.css** — Tailwind CSS v4 with `@import "tailwindcss"`, `@theme` block for design tokens, `@apply` component classes. Terminal/cybersecurity dashboard theme: high-density, low-glare dark interface with crisp monospaced typography (JetBrains Mono / Fira Code / Cascadia Code). Green accent (`#00ff88`) with neon green status indicators. Sharp corners (2px radius), 12px base font size, tight padding throughout. Desktop sidebar layout via CSS Grid (`@media (min-width: 768px)`: 220px sidebar + flexible chat area). Component classes (toast, dialog, device-card, ex-item, sh-line, etc.) defined with `@apply` in `@layer components` so JS-created DOM elements keep short class names.
+- **vite.config.js** — Vite config with `@tailwindcss/vite` plugin.
+- **package.json** — Vite + Tailwind CSS v4 dev dependencies and build scripts (`dev`, `build`, `preview`).
+- **public/manifest.json** — PWA manifest with inline SVG icon using monospace green-bordered "SC" logo (installable on phones). Served as static asset by Vite.
 
 ### CI/CD (`.github/workflows/`)
 
@@ -115,7 +123,7 @@ Vanilla HTML/JS/CSS, no framework, no build step. Modern ES2020+ syntax (const/l
 
 ### Config Files (repo root)
 
-- **netlify.toml** — Netlify deploy config: `publish = "."` (relative to base `frontend/`), no build command, security headers (X-Frame-Options, X-Content-Type-Options, Referrer-Policy).
+- **netlify.toml** — Netlify deploy config: base `frontend/`, build `npm install && npm run build`, publish `dist/`. Security headers (X-Frame-Options, X-Content-Type-Options, Referrer-Policy).
 
 ## Key Design Decisions
 
@@ -161,3 +169,5 @@ Vanilla HTML/JS/CSS, no framework, no build step. Modern ES2020+ syntax (const/l
 ## Dependencies
 
 Backend (`requirements.txt`): mss, Pillow, keyring, pyttsx3, requests, pyperclip, pynput, sounddevice, PyJWT, bcrypt, psutil, opencv-python-headless. External binary: `cloudflared` must be in PATH for tunneling.
+
+Frontend (`frontend/package.json` devDependencies): vite, tailwindcss (v4), `@tailwindcss/vite`. No runtime dependencies — all frontend code is vanilla JS.

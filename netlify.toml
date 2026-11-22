@@ -1,6 +1,7 @@
 [build]
-  publish = "."
-  command = "# no build step"
+  base = "frontend"
+  publish = "dist"
+  command = "npm install && npm run build"
 
 [[headers]]
   for = "/*"

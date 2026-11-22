@@ -1585,4 +1585,19 @@ function stopHealth() {
 
 /* ═══ INIT ═══ */
 
+/* ═══ MODULE EXPORTS ═══ */
+
+Object.assign(window, {
+  doAuth, doLogout, refreshDevices, doLogin, hideLogin, disconnect,
+  openLog, execCmd, openLiveScreen, openLiveCam, promptSpeech,
+  openLiveMic, openExplorer, enterShell, clipboardMenu, openKeylog,
+  checkUpdate, confirmShutdown, clearShell, closeShell, shellKey,
+  runShell, explorerBack, filterExplorer, closeExplorer, uploadToExplorer,
+  handleUpload, createFolder, createFile, closeEditor, saveEditor,
+  edKey, edChanged, setLiveQ, setLiveMon, closeLive, setCamQ, closeLiveCam,
+  closeMic, startMic, stopMic, closeKeylog, startKeylog, stopKeylog,
+  clearKeylog, copyKeylog, closeUpdate, applyUpdate, downloadLog,
+  clearLog, closeLog, closeLightbox,
+});
+
 window.onload = () => checkAuth();
