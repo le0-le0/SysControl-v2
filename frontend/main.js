@@ -121,7 +121,7 @@ function showDialog({ title = "Confirm", message = "", input = false, placeholde
       resolve(result);
     };
 
-    box.querySelector(".dialog-cancel").onclick = () => finish(null);
+    box.querySelector(".dialog-cancel").onclick = () => finish(false);
     box.querySelector(".dialog-confirm").onclick = () => {
       if (input) finish(inputEl.value);
       else finish(true);
@@ -417,7 +417,7 @@ function showPanel() {
   $("panelName").textContent = conn.device;
   $("panelVersion").textContent = `v${conn.version}`;
   $("chatArea").innerHTML = "";
-  addMsg("bot", `> connected to ${conn.device} [v${conn.version}]\n> use controls below`);
+  addMsg("bot", `> connected to ${conn.device} [v${conn.version}]\n> ready`);
   startHealth();
 }
 
@@ -556,6 +556,7 @@ function removeTyping() {
 async function execCmd(cmd) {
   addMsg("user", cmd);
   addTyping();
+  slog("info", `exec: ${cmd}`);
   try {
     const d = await api("/api/cmd", {
       method: "POST",
@@ -605,6 +606,7 @@ async function clipboardMenu() {
     confirmText: "Paste To",
     cancelText: "Read",
   });
+  if (ok === null) return;
   if (ok) {
     const text = await showDialog({
       title: "Paste to Clipboard",
@@ -613,7 +615,7 @@ async function clipboardMenu() {
       placeholder: "text to paste...",
       confirmText: "Paste",
     });
-    if (text !== null) execCmd(`/clipboard set ${text}`);
+    if (text !== null && text !== false) execCmd(`/clipboard set ${text}`);
   } else {
     execCmd("/clipboard");
   }
@@ -784,10 +786,11 @@ function renderExplorer(items, error, filtering) {
     list.appendChild(up);
   }
 
-  if (error) { list.innerHTML += `<div class="ex-empty">${esc(error)}</div>`; }
+  if (error) { const d = document.createElement("div"); d.className = "ex-empty"; d.textContent = error; list.appendChild(d); }
 
   if (!items.length && !error) {
-    list.innerHTML += `<div class="ex-empty">${filtering ? "No match" : "Empty"}</div>`;
+    const d = document.createElement("div"); d.className = "ex-empty"; d.textContent = filtering ? "No match" : "Empty";
+    list.appendChild(d);
     return;
   }
 
@@ -960,7 +963,7 @@ function uploadFiles(files) {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${conn.token}` },
         body: JSON.stringify({ name: file.name, path: exPath, data: b64 }),
-      }).then(() => next()).catch(() => next());
+      }).then((r) => { if (!r.ok) toast(`Failed to upload ${file.name}`, "error"); next(); }).catch(() => { toast(`Failed to upload ${file.name}`, "error"); next(); });
     };
     reader.readAsDataURL(file);
   }
