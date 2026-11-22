@@ -164,8 +164,11 @@ def apply_update(update_info):
             f.write(f'start "" "{current_exe}"\n')
             f.write(f'del "%~f0"\n')
 
-        import config
-        config.set_version(version)
+        try:
+            import config
+            config.set_version(version)
+        except Exception:
+            pass  # credential store may be unavailable (locked screen / SYSTEM session)
 
         subprocess.Popen(["cmd", "/c", bat], creationflags=_NO_WINDOW)
         os._exit(0)
