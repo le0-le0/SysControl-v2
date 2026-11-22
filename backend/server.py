@@ -201,11 +201,18 @@ class Handler(BaseHTTPRequestHandler):
             self._json(updater.get_status())
             return
 
+        if path == "/api/monitors":
+            if not self._auth_or_deny():
+                return
+            self._json({"ok": True, "monitors": screen.list_monitors()})
+            return
+
         if path == "/api/screen-live":
             if not self._auth_or_deny():
                 return
             q = qs.get("q", ["med"])[0]
-            data = screen.live_frame(q)
+            mon = qs.get("mon", ["1"])[0]
+            data = screen.live_frame(q, mon)
             self._send(200, "image/jpeg", data)
             return
 
@@ -362,8 +369,9 @@ class Handler(BaseHTTPRequestHandler):
             self._json({"type": "text", "text": "Empty command"})
             return
 
-        if cmd == "/screen":
-            data = screen.screenshot_jpeg()
+        if cmd.startswith("/screen"):
+            mon = cmd[7:].strip() or "1"
+            data = screen.screenshot_jpeg(monitor=mon)
             self._json({"type": "photo", "data": "data:image/jpeg;base64," + base64.b64encode(data).decode()})
             return
 
@@ -389,6 +397,14 @@ class Handler(BaseHTTPRequestHandler):
         if cmd == "/clipboard":
             text = system.get_clipboard()
             self._json({"type": "text", "text": text or "(empty clipboard)"})
+            return
+
+        if cmd.startswith("/clipboard set "):
+            text = cmd[15:]
+            if system.set_clipboard(text):
+                self._json({"type": "text", "text": "Clipboard updated"})
+            else:
+                self._json({"type": "text", "text": "Failed to set clipboard"})
             return
 
         if cmd == "/wifi":

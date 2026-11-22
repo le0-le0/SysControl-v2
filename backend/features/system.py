@@ -81,6 +81,14 @@ def get_clipboard():
         return None
 
 
+def set_clipboard(text):
+    try:
+        pyperclip.copy(text)
+        return True
+    except Exception:
+        return False
+
+
 def get_wifi_passwords():
     profiles = []
     try:

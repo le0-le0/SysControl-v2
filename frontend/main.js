@@ -1,7 +1,7 @@
 /* SysControl v2 — Frontend */
 
 const GAS_URL = "https://script.google.com/macros/s/AKfycbwVtNbpmiTUMGfTVIMkhdqV0qaKsbpPuMkdaEveKvpvNDERfpWghcatvSXh2IWSqC1l/exec";
-const conn = { url: "", token: "", device: "", version: "" };
+const conn = { url: "", token: "", device: "", version: "", _password: "" };
 let devices = [];
 let healthInterval = null;
 let authUser = "";
@@ -11,6 +11,52 @@ const show = (id) => $(id).classList.remove("hidden");
 const hide = (id) => $(id).classList.add("hidden");
 const esc = (s) => { const d = document.createElement("div"); d.textContent = s; return d.innerHTML; };
 const now = () => new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+
+/* ═══ ACTIVITY LOG ═══ */
+
+const _logs = [];
+const MAX_LOGS = 500;
+
+function slog(level, msg) {
+  const ts = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  const entry = { ts, level, msg };
+  _logs.push(entry);
+  if (_logs.length > MAX_LOGS) _logs.shift();
+  const el = $("logOutput");
+  if (el && !$("logOverlay").classList.contains("hidden")) _appendLogLine(el, entry);
+}
+
+function _appendLogLine(el, entry) {
+  const line = document.createElement("div");
+  line.className = `log-line log-${entry.level}`;
+  line.textContent = `[${entry.ts}] ${entry.level.toUpperCase()} ${entry.msg}`;
+  el.appendChild(line);
+  el.scrollTop = el.scrollHeight;
+}
+
+function openLog() {
+  show("logOverlay");
+  const el = $("logOutput");
+  el.innerHTML = "";
+  _logs.forEach((e) => _appendLogLine(el, e));
+}
+
+function closeLog() { hide("logOverlay"); }
+
+function clearLog() { _logs.length = 0; $("logOutput").innerHTML = ""; }
+
+function downloadLog() {
+  const text = _logs.map((e) => `[${e.ts}] ${e.level.toUpperCase()} ${e.msg}`).join("\n");
+  const blob = new Blob([text], { type: "text/plain" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `syscontrol-log-${new Date().toISOString().slice(0, 10)}.txt`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+window.addEventListener("error", (e) => slog("error", `Uncaught: ${e.message} at ${e.filename}:${e.lineno}`));
+window.addEventListener("unhandledrejection", (e) => slog("error", `Unhandled rejection: ${e.reason}`));
 
 /* ═══ TOAST NOTIFICATIONS ═══ */
 
@@ -127,6 +173,7 @@ async function doAuth() {
       hide("authScreen");
       show("homeScreen");
       loadDevices();
+      slog("info", `Auth: logged in as ${authUser}`);
       toast(`Welcome back, ${authUser}`, "success");
     } else {
       $("authError").textContent = d.error || "Login failed";
@@ -149,6 +196,7 @@ function doLogout() {
   $("authPass").value = "";
   $("authError").textContent = "";
   conn.token = "";
+  conn._password = "";
   stopHealth();
 }
 
@@ -302,8 +350,11 @@ async function autoLogin(dev) {
       conn.token = d.token;
       conn.device = d.device;
       conn.version = d.version;
+      conn._password = dev._password;
+      slog("info", `Connected to ${d.device} v${d.version}`);
       showPanel();
     } else {
+      slog("warn", `Connect failed: ${d.error || "wrong password"}`);
       renderDevices();
       toast("Connection failed: " + (d.error || "wrong password"), "error");
     }
@@ -344,6 +395,7 @@ async function doLogin() {
       conn.token = d.token;
       conn.device = d.device;
       conn.version = d.version;
+      conn._password = pw;
       hideLogin();
       showPanel();
     } else {
@@ -370,27 +422,87 @@ function showPanel() {
 }
 
 function disconnect() {
+  slog("info", `Disconnected from ${conn.device}`);
   hide("panelScreen");
   show("homeScreen");
   $("chatArea").innerHTML = "";
   conn.token = "";
+  conn._password = "";
   stopHealth();
-  closeLive(); closeLiveCam(); closeMic(); closeKeylog(); closeShell(); closeExplorer(); closeEditor();
+  closeLive(); closeLiveCam(); closeMic(); closeKeylog(); closeShell(); closeExplorer(); closeEditor(); closeLog();
   refreshDevices();
 }
 
 /* ═══ API HELPERS ═══ */
 
+let _refreshing = null;
+
+async function _refreshToken() {
+  if (_refreshing) return _refreshing;
+  _refreshing = (async () => {
+    try {
+      const r = await fetch(`${conn.url}/api/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: conn._password }),
+        signal: AbortSignal.timeout(8000),
+      });
+      const d = await r.json();
+      if (d.ok) { conn.token = d.token; return true; }
+    } catch {}
+    toast("Session expired. Please reconnect.", "warning");
+    return false;
+  })();
+  const result = await _refreshing;
+  _refreshing = null;
+  return result;
+}
+
 function api(path, opts = {}) {
   const h = opts.headers || {};
   if (conn.token && !h["Authorization"]) h["Authorization"] = `Bearer ${conn.token}`;
+  if (!opts.signal) opts.signal = AbortSignal.timeout(15000);
   opts.headers = h;
-  return fetch(conn.url + path, opts).then((r) => r.json().catch(() => ({ ok: false, error: "Invalid response" })));
+  const t0 = Date.now();
+  return fetch(conn.url + path, opts).then(async (r) => {
+    if (r.status === 401 && conn._password) {
+      slog("warn", `${path} → 401, refreshing token`);
+      if (await _refreshToken()) {
+        h["Authorization"] = `Bearer ${conn.token}`;
+        return fetch(conn.url + path, { ...opts, signal: AbortSignal.timeout(15000) })
+          .then((r2) => r2.json().catch(() => ({ ok: false, error: "Invalid response" })));
+      }
+    }
+    const d = await r.json().catch(() => ({ ok: false, error: "Invalid response" }));
+    if (d.error || d.ok === false) slog("warn", `${path} → ${d.error || "fail"} (${Date.now() - t0}ms)`);
+    else slog("info", `${path} → ok (${Date.now() - t0}ms)`);
+    return d;
+  }).catch((e) => {
+    slog("error", `${path} → ${e.name === "TimeoutError" ? "timeout" : e.message} (${Date.now() - t0}ms)`);
+    throw e;
+  });
 }
 
 function apiRaw(path) {
+  const t0 = Date.now();
   return fetch(conn.url + path, {
     headers: { Authorization: `Bearer ${conn.token}` },
+    signal: AbortSignal.timeout(15000),
+  }).then(async (r) => {
+    if (r.status === 401 && conn._password) {
+      slog("warn", `${path} → 401, refreshing token`);
+      if (await _refreshToken()) {
+        return fetch(conn.url + path, {
+          headers: { Authorization: `Bearer ${conn.token}` },
+          signal: AbortSignal.timeout(15000),
+        });
+      }
+    }
+    if (!r.ok) slog("warn", `${path} → HTTP ${r.status} (${Date.now() - t0}ms)`);
+    return r;
+  }).catch((e) => {
+    slog("error", `${path} → ${e.name === "TimeoutError" ? "timeout" : e.message} (${Date.now() - t0}ms)`);
+    throw e;
   });
 }
 
@@ -484,6 +596,27 @@ async function promptSpeech() {
     confirmText: "Speak",
   });
   if (text && text.trim()) execCmd(`/speech ${text.trim()}`);
+}
+
+async function clipboardMenu() {
+  const ok = await showDialog({
+    title: "Clipboard",
+    message: "Read the remote clipboard, or paste text to it?",
+    confirmText: "Paste To",
+    cancelText: "Read",
+  });
+  if (ok) {
+    const text = await showDialog({
+      title: "Paste to Clipboard",
+      message: "Text to send to the remote clipboard:",
+      input: true,
+      placeholder: "text to paste...",
+      confirmText: "Paste",
+    });
+    if (text !== null) execCmd(`/clipboard set ${text}`);
+  } else {
+    execCmd("/clipboard");
+  }
 }
 
 /* ═══ SHELL ═══ */
@@ -802,9 +935,10 @@ async function createFile() {
 
 function uploadToExplorer() { $("exFileInput").value = ""; $("exFileInput").click(); }
 
-function handleUpload(input) {
-  if (!input.files || !input.files.length) return;
-  const files = Array.from(input.files);
+function handleUpload(input) { uploadFiles(Array.from(input.files || [])); }
+
+function uploadFiles(files) {
+  if (!files.length) return;
   let idx = 0;
 
   function next() {
@@ -832,6 +966,20 @@ function handleUpload(input) {
   }
   next();
 }
+
+(function initDragDrop() {
+  const list = $("exList");
+  let dragCount = 0;
+  list.addEventListener("dragenter", (e) => { e.preventDefault(); if (++dragCount === 1) list.classList.add("drag-over"); });
+  list.addEventListener("dragleave", () => { if (--dragCount <= 0) { dragCount = 0; list.classList.remove("drag-over"); } });
+  list.addEventListener("dragover", (e) => e.preventDefault());
+  list.addEventListener("drop", (e) => {
+    e.preventDefault();
+    dragCount = 0;
+    list.classList.remove("drag-over");
+    if (e.dataTransfer.files.length) uploadFiles(Array.from(e.dataTransfer.files));
+  });
+})();
 
 function fmtSize(b) {
   if (!b || b <= 0) return "0 B";
@@ -939,7 +1087,7 @@ async function closeEditor() {
 
 /* ═══ LIVE SCREEN ═══ */
 
-const live = { on: false, q: "med", delay: 50, frames: 0, t0: 0, busy: false };
+const live = { on: false, q: "med", mon: 1, delay: 50, frames: 0, t0: 0, busy: false };
 const LIVE_DELAY = { low: 150, med: 50, high: 10 };
 
 function openLiveScreen() {
@@ -947,7 +1095,23 @@ function openLiveScreen() {
   live.on = true;
   live.frames = 0;
   live.t0 = Date.now();
+  loadMonitors();
   setLiveQ(live.q);
+}
+
+function loadMonitors() {
+  api("/api/monitors").then((d) => {
+    const bar = $("monBtns");
+    if (!d.ok || !d.monitors || d.monitors.length <= 1) { bar.innerHTML = ""; return; }
+    bar.innerHTML = d.monitors.map((m) =>
+      `<button class="qb mon-qb${m.index === live.mon ? " active" : ""}" data-mon="${m.index}" onclick="setLiveMon(${m.index})" title="${m.width}×${m.height}">${m.index}</button>`
+    ).join("");
+  });
+}
+
+function setLiveMon(mon) {
+  live.mon = mon;
+  document.querySelectorAll(".mon-qb").forEach((b) => b.classList.toggle("active", +b.getAttribute("data-mon") === mon));
 }
 
 function setLiveQ(q) {
@@ -960,7 +1124,7 @@ function setLiveQ(q) {
 function fetchFrame() {
   if (!live.on || live.busy) return;
   live.busy = true;
-  apiRaw(`/api/screen-live?q=${live.q}&t=${Date.now()}`)
+  apiRaw(`/api/screen-live?q=${live.q}&mon=${live.mon}&t=${Date.now()}`)
     .then((r) => r.blob())
     .then((blob) => {
       if (!live.on) return;
@@ -1387,6 +1551,7 @@ document.addEventListener("keydown", (e) => {
     if (!$("camOverlay").classList.contains("hidden")) { closeLiveCam(); return; }
     if (!$("micOverlay").classList.contains("hidden")) { closeMic(); return; }
     if (!$("keylogOverlay").classList.contains("hidden")) { closeKeylog(); return; }
+    if (!$("logOverlay").classList.contains("hidden")) { closeLog(); return; }
   }
 });
 
@@ -1403,6 +1568,7 @@ function startHealth() {
         $("panelDot").className = "status-dot";
       })
       .catch(() => {
+        if ($("panelStatus").textContent !== "Offline") slog("warn", "Health: device went offline");
         $("panelStatus").textContent = "Offline";
         $("panelStatus").className = "status-label offline";
         $("panelDot").className = "status-dot offline";
