@@ -82,7 +82,7 @@
 
 body::before {
   content: '';
-  @apply fixed top-0 left-0 right-0 bg-accent z-[10000];
+  @apply fixed top-0 left-0 right-0 bg-accent z-10000;
   height: 1px;
   opacity: 0.5;
 }
@@ -106,7 +106,7 @@ body::before {
   /* ── Toast ── */
 
   .toast-container {
-    @apply fixed bottom-4 right-4 z-[9999] flex flex-col gap-1.5 pointer-events-none max-w-[360px];
+    @apply fixed bottom-4 right-4 z-9999 flex flex-col gap-1.5 pointer-events-none max-w-90;
   }
   .toast {
     @apply py-2.5 px-3.5 rounded border border-edge bg-base-3 text-txt text-xs pointer-events-auto shadow flex items-center gap-2.5;
@@ -127,12 +127,12 @@ body::before {
   /* ── Custom Dialog ── */
 
   .dialog-backdrop {
-    @apply fixed inset-0 flex items-center justify-center z-[600] p-4 animate-fade-in;
+    @apply fixed inset-0 flex items-center justify-center z-600 p-4 animate-fade-in;
     background: rgba(0, 0, 0, 0.7);
     backdrop-filter: blur(4px);
   }
   .dialog-box {
-    @apply bg-base-2 border border-edge rounded-lg p-5 w-full max-w-[400px] shadow-lg animate-scale-in;
+    @apply bg-base-2 border border-edge rounded-lg p-5 w-full max-w-100 shadow-lg animate-scale-in;
   }
   .dialog-title {
     @apply text-[13px] font-semibold text-accent uppercase mb-2;
@@ -148,12 +148,12 @@ body::before {
 
   /* ── Auth Screen ── */
 
-  .screen { @apply min-h-dvh p-4 max-w-[520px] mx-auto animate-fade-in; }
+  .screen { @apply min-h-dvh p-4 max-w-130 mx-auto animate-fade-in; }
 
   .auth-box { @apply flex flex-col items-center justify-center min-h-dvh p-4; }
 
   .auth-form {
-    @apply w-full max-w-[380px] bg-base-2 border border-edge rounded-lg shadow relative overflow-hidden;
+    @apply w-full max-w-95 bg-base-2 border border-edge rounded-lg shadow relative overflow-hidden;
     padding: 28px;
     animation: fadeUp 0.4s ease 0.2s both;
   }
@@ -262,12 +262,12 @@ body::before {
   /* ── Modal ── */
 
   .modal {
-    @apply fixed inset-0 flex items-center justify-center z-[100] p-4 animate-fade-in;
+    @apply fixed inset-0 flex items-center justify-center z-100 p-4 animate-fade-in;
     background: rgba(0, 0, 0, 0.7);
     backdrop-filter: blur(4px);
   }
   .modal-card {
-    @apply bg-base-2 border border-edge rounded-lg p-6 w-full max-w-[400px] shadow-lg animate-scale-in;
+    @apply bg-base-2 border border-edge rounded-lg p-6 w-full max-w-100 shadow-lg animate-scale-in;
   }
   .modal-card h2 {
     @apply text-sm mb-5 text-bright font-semibold;
@@ -276,7 +276,7 @@ body::before {
 
   .device-login-header { @apply text-center mb-5; }
   .device-icon {
-    @apply w-11 h-11 border border-accent rounded text-accent flex items-center justify-center text-base mx-auto mb-3 bg-accent-dim font-semibold;
+    @apply w-11 h-11 border border-accent rounded text-accent flex items-center justify-center mx-auto mb-3 bg-accent-dim font-semibold;
   }
   .status-line { @apply text-dim text-[10px] break-all mt-1; }
   .modal-actions { @apply flex gap-2 mt-5; }
@@ -312,7 +312,7 @@ body::before {
   }
 
   .back-btn {
-    @apply bg-transparent border border-edge text-dim text-base cursor-pointer transition-all duration-100 rounded;
+    @apply bg-transparent border border-edge text-dim cursor-pointer transition-all duration-100 rounded;
     padding: 4px 8px;
   }
   .back-btn:hover { @apply text-bright border-edge-h; }
@@ -325,7 +325,7 @@ body::before {
   .msg.user { @apply justify-end; }
 
   .bubble {
-    @apply max-w-[85%] text-xs whitespace-pre-wrap break-words rounded;
+    @apply max-w-[85%] text-xs whitespace-pre-wrap wrap-break-word rounded;
     padding: 10px 14px;
     line-height: 1.7;
   }
@@ -427,7 +427,7 @@ body::before {
     padding: 10px 12px;
   }
   .sh-ps1 {
-    @apply text-accent text-[11px] whitespace-nowrap max-w-[140px] truncate;
+    @apply text-accent text-[11px] whitespace-nowrap max-w-35 truncate;
     padding-top: 7px;
   }
   .sh-input {
@@ -520,7 +520,7 @@ body::before {
   .live-img { @apply max-w-full max-h-full object-contain; }
   .live-meta { @apply text-[10px] text-accent font-medium; }
 
-  .quality-btns { @apply flex gap-[3px]; }
+  .quality-btns { @apply flex gap-0.75; }
   .qb {
     @apply bg-transparent border border-edge rounded text-dim text-[10px] cursor-pointer font-medium transition-all duration-100;
     padding: 4px 10px;
@@ -577,7 +577,7 @@ body::before {
   /* ── Lightbox ── */
 
   .lightbox {
-    @apply fixed inset-0 flex items-center justify-center z-[200] cursor-pointer animate-fade-in;
+    @apply fixed inset-0 flex items-center justify-center z-200 cursor-pointer animate-fade-in;
     background: rgba(0, 0, 0, 0.95);
   }
   .lightbox img { @apply rounded; max-width: 95%; max-height: 95%; object-fit: contain; }
