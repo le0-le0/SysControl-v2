@@ -92,11 +92,19 @@ def mic_start(sample_rate=16000, channels=1):
         return {"ok": False, "error": str(e)}
 
 
-def mic_chunk():
+def mic_chunk(max_blocks=5):
     try:
         pcm = _mic_queue.get(timeout=1)
     except queue.Empty:
         return None
+    # Coalesce up to max_blocks (~500ms) of already-queued audio into one response,
+    # so each HTTP round-trip carries more audio and the stream survives tunnel
+    # latency without the queue backing up and dropping blocks (choppy audio).
+    for _ in range(max_blocks - 1):
+        try:
+            pcm += _mic_queue.get_nowait()
+        except queue.Empty:
+            break
     buf = io.BytesIO()
     with wave.open(buf, "wb") as wf:
         wf.setnchannels(_mic_channels)

@@ -1433,7 +1433,7 @@ async function startMic() {
     mic.on = true;
     if (!mic.ctx) mic.ctx = new (window.AudioContext || window.webkitAudioContext)();
     if (mic.ctx.state === "suspended") mic.ctx.resume();
-    mic.next = mic.ctx.currentTime;
+    mic.next = mic.ctx.currentTime + 0.3;  // pre-roll jitter buffer so late chunks don't drop to silence
     hide("micStartBtn");
     show("micStopBtn");
     $("micStatus").textContent = "Listening...";
@@ -1459,7 +1459,9 @@ async function micLoop() {
         const src = mic.ctx.createBufferSource();
         src.buffer = ab;
         src.connect(mic.ctx.destination);
-        const t = Math.max(mic.next, mic.ctx.currentTime);
+        // if we fell behind (underrun), rebuild the pre-roll cushion instead of running with none
+        let t = mic.next;
+        if (t < mic.ctx.currentTime) t = mic.ctx.currentTime + 0.3;
         src.start(t);
         mic.next = t + ab.duration;
       } catch {}
