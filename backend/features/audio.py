@@ -1,10 +1,10 @@
-"""Text-to-Speech (offline, pyttsx3) + Live Microphone streaming."""
+"""Text-to-Speech (offline, Windows SAPI) + Live Microphone streaming."""
 import io
 import wave
 import queue
+import platform
+import subprocess
 import threading
-
-import pyttsx3
 
 try:
     import sounddevice as sd
@@ -13,6 +13,7 @@ except Exception:
     SOUNDDEVICE_OK = False
 
 _tts_lock = threading.Lock()
+_NO_WINDOW = 0x08000000 if platform.system() == "Windows" else 0
 
 # Mic state
 _mic_stream = None
@@ -22,13 +23,30 @@ _mic_channels = 1
 
 
 def speak(text, rate=175):
+    # Windows SAPI via PowerShell; text goes over stdin so nothing is shell-escaped.
+    # SAPI Rate is -10..10; map from words-per-minute (pyttsx3 default was 175).
+    sapi_rate = max(-10, min(10, round((rate - 175) / 20)))
+    ps = ("[Console]::InputEncoding=[System.Text.Encoding]::UTF8;"
+          "Add-Type -AssemblyName System.Speech;"
+          "$s=New-Object System.Speech.Synthesis.SpeechSynthesizer;"
+          "$s.Rate=%d;"
+          "$s.Speak([Console]::In.ReadToEnd())" % sapi_rate)
+
     def _do():
         with _tts_lock:
-            engine = pyttsx3.init()
-            engine.setProperty("rate", rate)
-            engine.say(text)
-            engine.runAndWait()
-            engine.stop()
+            si = None
+            if platform.system() == "Windows":
+                si = subprocess.STARTUPINFO()
+                si.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                si.wShowWindow = 0
+            try:
+                p = subprocess.Popen(
+                    ["powershell", "-NoProfile", "-NonInteractive", "-Command", ps],
+                    stdin=subprocess.PIPE, stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL, creationflags=_NO_WINDOW, startupinfo=si)
+                p.communicate(text.encode("utf-8"), timeout=300)
+            except Exception:
+                pass
     threading.Thread(target=_do, daemon=True).start()
     return True
 

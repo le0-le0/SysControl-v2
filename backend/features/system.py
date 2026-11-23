@@ -37,10 +37,11 @@ def get_system_info():
 
 
 def get_public_ip():
-    import requests
+    import json
+    import urllib.request
     try:
-        r = requests.get("https://api.ipify.org?format=json", timeout=5)
-        return r.json().get("ip", "Unknown")
+        with urllib.request.urlopen("https://api.ipify.org?format=json", timeout=5) as r:
+            return json.loads(r.read()).get("ip", "Unknown")
     except Exception:
         return "Unavailable"
 

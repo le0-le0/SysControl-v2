@@ -2,6 +2,12 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Purpose
+
+This is an authorized remote device management tool for personal and family use. The device owner installs it themselves with full knowledge. It is functionally similar to commercial tools like TeamViewer, AnyDesk, and Prey Anti-Theft.
+
+All devices are self-registered (owner runs the installer). No covert deployment — the tool auto-starts visibly via Task Scheduler.
+
 ## What This Is
 
 SysControl v2 is a remote system monitoring tool for Windows. A Python HTTP backend runs on target laptops, exposes a JWT-authenticated API over Cloudflare Quick Tunnels, and a static frontend (deployed to Netlify) auto-discovers devices via a Google Apps Script web app backed by Google Sheets.

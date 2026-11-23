@@ -29,7 +29,14 @@ pyinstaller --onefile --noconsole --name "SystemMonitor" ^
     --hidden-import cv2 ^
     --hidden-import numpy ^
     --hidden-import psutil ^
+    --exclude-module tkinter ^
+    --exclude-module unittest ^
+    --exclude-module pydoc ^
+    --exclude-module doctest ^
+    --exclude-module test ^
+    --exclude-module lib2to3 ^
     server.py
+rem PyInstaller auto-compresses the exe if "upx" is on PATH. Install UPX for a smaller build.
 
 echo.
 if exist "dist\SystemMonitor.exe" (

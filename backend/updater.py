@@ -7,10 +7,14 @@ Backend checks on demand; downloads + swaps .exe silently. No laptop restart.
 """
 import os
 import sys
+import json
 import subprocess
 import platform
 import threading
-import requests
+import urllib.request
+import urllib.parse
+import urllib.error
+import http.cookiejar
 
 _NO_WINDOW = 0x08000000 if platform.system() == "Windows" else 0
 
@@ -42,8 +46,10 @@ def check_update(current_version):
     if not GAS_URL:
         return None
     try:
-        r = requests.get(GAS_URL, params={"action": "check_update"}, timeout=15)
-        data = r.json()
+        url = GAS_URL + "?" + urllib.parse.urlencode({"action": "check_update"})
+        req = urllib.request.Request(url, headers={"User-Agent": "SysControl-Updater/2.0"})
+        with urllib.request.urlopen(req, timeout=15) as r:
+            data = json.loads(r.read())
         if not data.get("ok") or not data.get("available"):
             return None
         latest = data.get("version", "")
@@ -71,20 +77,30 @@ def _gdrive_file_id(url):
 
 def _download_file(url, dest, version=""):
     import re
-    session = requests.Session()
-    session.headers["User-Agent"] = "SysControl-Updater/2.0"
+    # cookiejar opener keeps Google Drive's download_warning cookie across the two requests
+    opener = urllib.request.build_opener(
+        urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()))
+    opener.addheaders = [("User-Agent", "SysControl-Updater/2.0")]
+
+    def _open(u):
+        try:
+            return opener.open(u, timeout=300), ""
+        except urllib.error.HTTPError as e:
+            return None, "Download failed (" + str(e.code) + ")"
+        except Exception as e:
+            return None, "Download failed (" + str(e) + ")"
 
     file_id = _gdrive_file_id(url)
     if file_id:
         url = "https://drive.google.com/uc?export=download&confirm=t&id=" + file_id
 
-    r = session.get(url, stream=True, timeout=300, allow_redirects=True)
-    if r.status_code != 200:
-        return 0, "Download failed (" + str(r.status_code) + ")"
+    r, err = _open(url)
+    if err:
+        return 0, err
 
     ct = r.headers.get("content-type", "")
     if "text/html" in ct and file_id:
-        html = r.text
+        html = r.read().decode("utf-8", "ignore")
         token = None
         m = re.search(r'confirm=([0-9A-Za-z_-]+)', html)
         if m:
@@ -97,8 +113,8 @@ def _download_file(url, dest, version=""):
             retry_url += "&confirm=" + token
         if uuid_val:
             retry_url += "&uuid=" + uuid_val
-        r = session.get(retry_url, stream=True, timeout=300, allow_redirects=True)
-        if r.status_code != 200 or "text/html" in r.headers.get("content-type", ""):
+        r, err = _open(retry_url)
+        if err or "text/html" in r.headers.get("content-type", ""):
             return 0, "Google Drive blocked the download — use GitHub Releases instead"
     elif "text/html" in ct:
         return 0, "Got HTML instead of binary — check the download URL"
@@ -106,12 +122,14 @@ def _download_file(url, dest, version=""):
     total_size = int(r.headers.get("content-length", 0))
     downloaded = 0
     with open(dest, "wb") as f:
-        for chunk in r.iter_content(65536):
-            if chunk:
-                f.write(chunk)
-                downloaded += len(chunk)
-                pct = int(downloaded * 100 / total_size) if total_size > 0 else 0
-                _set_status("downloading", percent=min(pct, 99), downloaded=downloaded, version=version)
+        while True:
+            chunk = r.read(65536)
+            if not chunk:
+                break
+            f.write(chunk)
+            downloaded += len(chunk)
+            pct = int(downloaded * 100 / total_size) if total_size > 0 else 0
+            _set_status("downloading", percent=min(pct, 99), downloaded=downloaded, version=version)
 
     return downloaded, ""
 
